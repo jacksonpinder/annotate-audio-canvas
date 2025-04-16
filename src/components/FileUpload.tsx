@@ -8,9 +8,10 @@ import { toast } from '@/components/ui/use-toast';
 interface FileUploadProps {
   onPdfUpload: (file: File) => void;
   onAudioUpload: (file: File) => void;
+  onBothFilesUploaded: () => void;
 }
 
-export default function FileUpload({ onPdfUpload, onAudioUpload }: FileUploadProps) {
+export default function FileUpload({ onPdfUpload, onAudioUpload, onBothFilesUploaded }: FileUploadProps) {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -21,6 +22,14 @@ export default function FileUpload({ onPdfUpload, onAudioUpload }: FileUploadPro
       if (file.type === 'application/pdf') {
         setPdfFile(file);
         onPdfUpload(file);
+        
+        // Check if both files are now uploaded
+        if (audioFile) {
+          toast({
+            title: "Files uploaded",
+            description: "Both PDF and audio files are ready to use",
+          });
+        }
       } else {
         toast({
           title: "Invalid file type",
@@ -37,6 +46,14 @@ export default function FileUpload({ onPdfUpload, onAudioUpload }: FileUploadPro
       if (file.type.startsWith('audio/')) {
         setAudioFile(file);
         onAudioUpload(file);
+        
+        // Check if both files are now uploaded
+        if (pdfFile) {
+          toast({
+            title: "Files uploaded",
+            description: "Both PDF and audio files are ready to use",
+          });
+        }
       } else {
         toast({
           title: "Invalid file type",
@@ -78,6 +95,26 @@ export default function FileUpload({ onPdfUpload, onAudioUpload }: FileUploadPro
         setAudioFile(audioFile);
         onAudioUpload(audioFile);
       }
+      
+      // Check if both files are now uploaded
+      if (pdfFile && audioFile) {
+        toast({
+          title: "Files uploaded",
+          description: "Both PDF and audio files are ready to use",
+        });
+      }
+    }
+  };
+
+  const handleContinue = () => {
+    if (pdfFile && audioFile) {
+      onBothFilesUploaded();
+    } else {
+      toast({
+        title: "Missing files",
+        description: "Please upload both a PDF and an audio file before continuing",
+        variant: "destructive"
+      });
     }
   };
 
@@ -103,7 +140,9 @@ export default function FileUpload({ onPdfUpload, onAudioUpload }: FileUploadPro
               className="cursor-pointer"
             />
             {pdfFile && (
-              <p className="text-xs text-muted-foreground truncate">{pdfFile.name}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                ✓ {pdfFile.name}
+              </p>
             )}
           </div>
           
@@ -117,9 +156,21 @@ export default function FileUpload({ onPdfUpload, onAudioUpload }: FileUploadPro
               className="cursor-pointer"
             />
             {audioFile && (
-              <p className="text-xs text-muted-foreground truncate">{audioFile.name}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                ✓ {audioFile.name}
+              </p>
             )}
           </div>
+        </div>
+        
+        <div className="mt-6">
+          <Button 
+            onClick={handleContinue}
+            disabled={!pdfFile || !audioFile}
+            className="w-full md:w-auto"
+          >
+            Continue to Annotation
+          </Button>
         </div>
       </div>
     </Card>

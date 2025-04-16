@@ -3,6 +3,8 @@ import { useState, useRef, useEffect } from 'react';
 import * as Tone from 'tone';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { playNote as playPianoNote, initializeSynth } from '@/lib/piano-utils';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface PianoKey {
   note: string;
@@ -16,6 +18,8 @@ export default function PianoKeyboard() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
   const [keys, setKeys] = useState<PianoKey[]>([]);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
   const isMobile = useIsMobile();
   
   // Initialize piano keys
@@ -49,10 +53,30 @@ export default function PianoKeyboard() {
     initializeSynth();
     
     // Scroll to middle C on mount
+    scrollToMiddleC();
+    
+    // Set up scroll check
+    checkScrollability();
+    
+    // Add event listener for container scroll
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('scroll', checkScrollability);
+    }
+    
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', checkScrollability);
+      }
+    };
+  }, []);
+
+  // Scroll to middle C
+  const scrollToMiddleC = () => {
     if (containerRef.current) {
       // Delay scrolling to ensure the container is fully rendered
       setTimeout(() => {
-        const middleCIndex = pianoKeys.findIndex(key => key.isMiddleC);
+        const middleCIndex = keys.findIndex(key => key.isMiddleC);
         if (middleCIndex >= 0 && containerRef.current) {
           const keyElements = containerRef.current.querySelectorAll('.piano-key');
           const middleCElement = keyElements[middleCIndex];
@@ -64,11 +88,39 @@ export default function PianoKeyboard() {
                                (middleCElement as HTMLElement).offsetWidth / 2;
             
             containerRef.current.scrollLeft = scrollOffset;
+            checkScrollability();
           }
         }
       }, 100);
     }
-  }, []);
+  };
+
+  // Check if we can scroll left or right
+  const checkScrollability = () => {
+    if (containerRef.current) {
+      const container = containerRef.current;
+      setCanScrollLeft(container.scrollLeft > 0);
+      setCanScrollRight(
+        container.scrollLeft < container.scrollWidth - container.clientWidth - 10
+      );
+    }
+  };
+
+  // Handle scroll button clicks
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (containerRef.current) {
+      const container = containerRef.current;
+      const scrollAmount = container.clientWidth * 0.75;
+      
+      if (direction === 'left') {
+        container.scrollLeft -= scrollAmount;
+      } else {
+        container.scrollLeft += scrollAmount;
+      }
+      
+      checkScrollability();
+    }
+  };
 
   // Play note when key is pressed
   const handlePlayNote = (key: PianoKey) => {
@@ -86,13 +138,40 @@ export default function PianoKeyboard() {
   };
 
   return (
-    <div className="piano-keyboard-container p-2">
+    <div className="piano-keyboard-container p-2 relative">
+      {/* Left scroll button */}
+      {canScrollLeft && (
+        <Button
+          className="absolute left-0 top-1/2 transform -translate-y-1/2 z-10 rounded-full bg-background/90 shadow-md h-10 w-10 flex items-center justify-center"
+          variant="outline"
+          size="icon"
+          onClick={() => handleScroll('left')}
+          aria-label="Scroll left"
+        >
+          <ChevronLeft size={20} />
+        </Button>
+      )}
+      
+      {/* Right scroll button */}
+      {canScrollRight && (
+        <Button
+          className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 rounded-full bg-background/90 shadow-md h-10 w-10 flex items-center justify-center"
+          variant="outline"
+          size="icon"
+          onClick={() => handleScroll('right')}
+          aria-label="Scroll right"
+        >
+          <ChevronRight size={20} />
+        </Button>
+      )}
+      
       <div 
         ref={containerRef}
         className="piano-keyboard max-h-72 overflow-x-auto flex relative"
         style={{ 
           touchAction: isMobile ? 'pan-y' : 'auto',
-          height: '220px'
+          height: '220px',
+          scrollBehavior: 'smooth'
         }}
       >
         <div className="flex relative">
@@ -105,7 +184,7 @@ export default function PianoKeyboard() {
                   ${activeKeys.has(key.note) ? 'bg-primary/20' : 'bg-white'} 
                   ${key.isMiddleC ? 'border-primary border-2' : 'border border-gray-300'}
                   hover:bg-primary/10 active:bg-primary/20 transition-colors
-                  w-10 h-full flex flex-col items-center justify-end pb-2 cursor-pointer`}
+                  w-12 h-full flex flex-col items-center justify-end pb-2 cursor-pointer`}
                 onClick={() => handlePlayNote(key)}
                 onTouchStart={(e) => {
                   e.preventDefault();
@@ -122,14 +201,17 @@ export default function PianoKeyboard() {
             ))}
           </div>
           
-          {/* Black keys as overlay */}
+          {/* Black keys as overlay - with improved positioning */}
           <div className="absolute top-0 left-0 flex">
             {keys.map((key, index) => {
               if (!key.isBlack) return null;
               
-              // Calculate position based on previous white key
-              const prevWhiteKeyIndex = keys.findIndex(k => !k.isBlack && k.note.charAt(0) === key.note.charAt(0));
-              const leftOffset = (prevWhiteKeyIndex * 40) + 30; // 40px = width of white key
+              // Find the white keys before and after this black key
+              const whiteKeysBefore = keys.filter((k, i) => !k.isBlack && i < index);
+              const whiteKeyIndex = whiteKeysBefore.length;
+              
+              // Position based on white key index
+              const leftOffset = (whiteKeyIndex * 48) - 12; // 48px = width of white key (w-12)
               
               return (
                 <div

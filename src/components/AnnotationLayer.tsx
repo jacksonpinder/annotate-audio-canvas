@@ -14,6 +14,7 @@ interface FreehandAnnotation {
   points: Point[];
   color: string;
   width: number;
+  pageNumber: number;
 }
 
 interface ShapeAnnotation {
@@ -23,6 +24,7 @@ interface ShapeAnnotation {
   end: Point;
   color: string;
   width: number;
+  pageNumber: number;
 }
 
 interface TextAnnotation {
@@ -31,6 +33,7 @@ interface TextAnnotation {
   content: string;
   color: string;
   fontSize: number;
+  pageNumber: number;
 }
 
 type Annotation = FreehandAnnotation | ShapeAnnotation | TextAnnotation;
@@ -39,9 +42,10 @@ interface AnnotationLayerProps {
   containerRef: RefObject<HTMLDivElement>;
   activeTool: string | null;
   scale: number;
+  pageNumber: number;
 }
 
-export default function AnnotationLayer({ containerRef, activeTool, scale }: AnnotationLayerProps) {
+export default function AnnotationLayer({ containerRef, activeTool, scale, pageNumber }: AnnotationLayerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentAnnotation, setCurrentAnnotation] = useState<Annotation | null>(null);
@@ -54,11 +58,14 @@ export default function AnnotationLayer({ containerRef, activeTool, scale }: Ann
   // Resize canvas when container size changes
   useEffect(() => {
     const resizeCanvas = () => {
-      if (canvasRef.current && containerRef.current) {
-        const container = containerRef.current;
-        canvasRef.current.width = container.clientWidth;
-        canvasRef.current.height = container.clientHeight;
-        renderAnnotations();
+      if (canvasRef.current) {
+        const canvas = canvasRef.current;
+        const parent = canvas.parentElement;
+        if (parent) {
+          canvas.width = parent.clientWidth;
+          canvas.height = parent.clientHeight;
+          renderAnnotations();
+        }
       }
     };
 
@@ -68,12 +75,12 @@ export default function AnnotationLayer({ containerRef, activeTool, scale }: Ann
     return () => {
       window.removeEventListener('resize', resizeCanvas);
     };
-  }, [containerRef]);
+  }, []);
 
-  // Re-render annotations when scale changes
+  // Filter annotations for current page and re-render when scale changes
   useEffect(() => {
     renderAnnotations();
-  }, [scale, annotations]);
+  }, [scale, annotations, pageNumber]);
 
   // Focus the text input when editing text
   useEffect(() => {
@@ -107,7 +114,8 @@ export default function AnnotationLayer({ containerRef, activeTool, scale }: Ann
         type: 'freehand',
         points: [position],
         color: '#000000',
-        width: 2
+        width: 2,
+        pageNumber
       });
     } else if (activeTool === 'shape') {
       setIsDrawing(true);
@@ -117,7 +125,8 @@ export default function AnnotationLayer({ containerRef, activeTool, scale }: Ann
         start: position,
         end: position,
         color: '#000000',
-        width: 2
+        width: 2,
+        pageNumber
       });
     } else if (activeTool === 'text') {
       const newTextAnnotation: TextAnnotation = {
@@ -125,7 +134,8 @@ export default function AnnotationLayer({ containerRef, activeTool, scale }: Ann
         position,
         content: '',
         color: '#000000',
-        fontSize: 16
+        fontSize: 16,
+        pageNumber
       };
       setEditingText(newTextAnnotation);
       setTextContent('');
@@ -203,8 +213,11 @@ export default function AnnotationLayer({ containerRef, activeTool, scale }: Ann
     // Create RoughCanvas instance using the updated import
     const roughCanvas = rough.canvas(canvas);
     
-    // Draw all annotations
-    annotations.forEach(annotation => {
+    // Filter annotations for the current page
+    const pageAnnotations = annotations.filter(anno => anno.pageNumber === pageNumber);
+    
+    // Draw all annotations for this page
+    pageAnnotations.forEach(annotation => {
       if (annotation.type === 'freehand') {
         ctx.strokeStyle = annotation.color;
         ctx.lineWidth = annotation.width;

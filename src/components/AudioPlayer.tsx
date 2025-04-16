@@ -3,7 +3,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { 
-  Play, Pause, SkipForward, SkipBack, Repeat, Volume2, VolumeX, Piano 
+  Play, Pause, Rewind, FastForward, Repeat, Volume2, Volume1, VolumeX, Piano, 
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import PianoKeyboard from './PianoKeyboard';
 
@@ -20,7 +21,6 @@ export default function AudioPlayer({ audioFile }: AudioPlayerProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
   const [showPiano, setShowPiano] = useState(false);
-  const [audioDuration, setAudioDuration] = useState(0);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -108,21 +108,6 @@ export default function AudioPlayer({ audioFile }: AudioPlayerProps) {
     }
   };
 
-  // Handle volume change
-  const handleVolumeChange = (newValue: number[]) => {
-    if (!audioRef.current) return;
-    
-    const newVolume = newValue[0];
-    audioRef.current.volume = newVolume;
-    setVolume(newVolume);
-    
-    if (newVolume === 0) {
-      setIsMuted(true);
-    } else {
-      setIsMuted(false);
-    }
-  };
-
   // Toggle mute
   const toggleMute = () => {
     if (!audioRef.current) return;
@@ -131,6 +116,30 @@ export default function AudioPlayer({ audioFile }: AudioPlayerProps) {
       audioRef.current.volume = volume;
       setIsMuted(false);
     } else {
+      audioRef.current.volume = 0;
+      setIsMuted(true);
+    }
+  };
+
+  // Cycle through volume levels
+  const cycleVolume = () => {
+    if (!audioRef.current) return;
+    
+    if (isMuted) {
+      // If muted, unmute and set to medium volume
+      audioRef.current.volume = 0.5;
+      setVolume(0.5);
+      setIsMuted(false);
+    } else if (volume > 0.7) {
+      // If high volume, set to medium
+      audioRef.current.volume = 0.5;
+      setVolume(0.5);
+    } else if (volume > 0.3) {
+      // If medium volume, set to low
+      audioRef.current.volume = 0.2;
+      setVolume(0.2);
+    } else {
+      // If low volume, mute
       audioRef.current.volume = 0;
       setIsMuted(true);
     }
@@ -167,7 +176,13 @@ export default function AudioPlayer({ audioFile }: AudioPlayerProps) {
     if (!audioRef.current) return;
     
     setDuration(audioRef.current.duration);
-    setAudioDuration(audioRef.current.duration);
+  };
+  
+  // Get appropriate volume icon
+  const getVolumeIcon = () => {
+    if (isMuted) return <VolumeX size={20} />;
+    if (volume < 0.5) return <Volume1 size={20} />;
+    return <Volume2 size={20} />;
   };
 
   return (
@@ -184,47 +199,36 @@ export default function AudioPlayer({ audioFile }: AudioPlayerProps) {
               onPlay={() => setIsPlaying(true)}
             />
             
-            <div className="grid grid-cols-12 gap-2 items-center">
+            <div className="flex items-center space-x-2 md:space-x-3">
               {/* Play/Pause Button */}
-              <div className="col-span-1">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={togglePlayPause}
-                  aria-label={isPlaying ? "Pause" : "Play"}
-                >
-                  {isPlaying ? <Pause size={20} /> : <Play size={20} />}
-                </Button>
-              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={togglePlayPause}
+                aria-label={isPlaying ? "Pause" : "Play"}
+                className="flex-shrink-0"
+              >
+                {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+              </Button>
               
-              {/* Skip Backward/Forward */}
-              <div className="col-span-2 flex justify-start">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => skip(-15)}
-                  aria-label="Skip backward 15 seconds"
-                >
-                  <SkipBack size={20} />
-                </Button>
-                
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => skip(15)}
-                  aria-label="Skip forward 15 seconds"
-                >
-                  <SkipForward size={20} />
-                </Button>
-              </div>
+              {/* Rewind 15 seconds */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => skip(-15)}
+                aria-label="Rewind 15 seconds"
+                className="flex-shrink-0"
+              >
+                <Rewind size={20} />
+              </Button>
               
               {/* Current Time */}
-              <div className="col-span-1 text-xs text-right">
+              <span className="text-xs text-muted-foreground flex-shrink-0">
                 {formatTime(currentTime)}
-              </div>
+              </span>
               
               {/* Progress Bar */}
-              <div className="col-span-4">
+              <div className="flex-grow mx-1">
                 <Slider
                   value={[currentTime]}
                   min={0}
@@ -235,57 +239,54 @@ export default function AudioPlayer({ audioFile }: AudioPlayerProps) {
                 />
               </div>
               
-              {/* Duration */}
-              <div className="col-span-1 text-xs text-left">
-                {formatTime(duration)}
-              </div>
+              {/* Duration/Time Left */}
+              <span className="text-xs text-muted-foreground flex-shrink-0">
+                {formatTime(duration - currentTime)}
+              </span>
+              
+              {/* Fast Forward 15 seconds */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => skip(15)}
+                aria-label="Fast forward 15 seconds"
+                className="flex-shrink-0"
+              >
+                <FastForward size={20} />
+              </Button>
+              
+              {/* Volume Button */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={cycleVolume}
+                aria-label="Volume control"
+                className="flex-shrink-0"
+              >
+                {getVolumeIcon()}
+              </Button>
               
               {/* Loop Button */}
-              <div className="col-span-1">
-                <Button 
-                  variant={isLooping ? "default" : "ghost"} 
-                  size="icon" 
-                  onClick={toggleLoop}
-                  aria-label={isLooping ? "Disable loop" : "Enable loop"}
-                >
-                  <Repeat size={20} />
-                </Button>
-              </div>
-              
-              {/* Volume Control */}
-              <div className="col-span-1">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={toggleMute}
-                  aria-label={isMuted ? "Unmute" : "Mute"}
-                >
-                  {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                </Button>
-              </div>
-              
-              <div className="col-span-2 md:block hidden">
-                <Slider
-                  value={[isMuted ? 0 : volume]}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  onValueChange={handleVolumeChange}
-                  aria-label="Volume"
-                />
-              </div>
+              <Button 
+                variant={isLooping ? "default" : "ghost"} 
+                size="icon" 
+                onClick={toggleLoop}
+                aria-label={isLooping ? "Disable loop" : "Enable loop"}
+                className="flex-shrink-0"
+              >
+                <Repeat size={20} />
+              </Button>
               
               {/* Piano Button */}
-              <div className="col-span-1">
-                <Button 
-                  variant={showPiano ? "default" : "ghost"} 
-                  size="icon" 
-                  onClick={togglePiano}
-                  aria-label={showPiano ? "Hide piano" : "Show piano"}
-                >
-                  <Piano size={20} />
-                </Button>
-              </div>
+              <Button 
+                variant={showPiano ? "default" : "ghost"} 
+                size="icon" 
+                onClick={togglePiano}
+                aria-label={showPiano ? "Hide piano" : "Show piano"}
+                className="flex-shrink-0"
+              >
+                <Piano size={20} />
+              </Button>
             </div>
           </>
         ) : (

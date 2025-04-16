@@ -6,6 +6,7 @@ import 'react-pdf/dist/esm/Page/TextLayer.css';
 import AnnotationToolbar from './AnnotationToolbar';
 import AnnotationLayer from './AnnotationLayer';
 import { useIsMobile } from '@/hooks/use-mobile';
+import LoadingSpinner from './LoadingSpinner';
 
 // Configure pdfjs worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -22,6 +23,7 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
   const [activeAnnotationTool, setActiveAnnotationTool] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const [pages, setPages] = useState<JSX.Element[]>([]);
 
   // Convert the File to a URL for react-pdf
   useEffect(() => {
@@ -39,13 +41,31 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
     setPageNumber(1);
-  }
-
-  function changePage(offset: number) {
-    if (numPages) {
-      const newPage = Math.max(1, Math.min(pageNumber + offset, numPages));
-      setPageNumber(newPage);
-    }
+    
+    // Create an array of Page components
+    const pagesArray = Array.from(
+      new Array(numPages),
+      (_, index) => (
+        <div key={`page_${index + 1}`} className="relative mb-4">
+          <Page 
+            key={`page_${index + 1}`}
+            pageNumber={index + 1} 
+            scale={scale}
+            width={isMobile ? window.innerWidth - 32 : undefined}
+            renderTextLayer={true}
+            renderAnnotationLayer={true}
+          />
+          <AnnotationLayer 
+            containerRef={containerRef}
+            activeTool={activeAnnotationTool} 
+            scale={scale}
+            pageNumber={index + 1}
+          />
+        </div>
+      )
+    );
+    
+    setPages(pagesArray);
   }
 
   function changeScale(delta: number) {
@@ -64,8 +84,8 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
             onZoomOut={() => changeScale(-0.1)}
             currentPage={pageNumber}
             totalPages={numPages || 0}
-            onPrevPage={() => changePage(-1)}
-            onNextPage={() => changePage(1)}
+            onPrevPage={() => setPageNumber(prev => Math.max(1, prev - 1))}
+            onNextPage={() => setPageNumber(prev => Math.min(numPages || 1, prev + 1))}
           />
           
           <div 
@@ -75,23 +95,15 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
             <Document
               file={pdfUrl}
               onLoadSuccess={onDocumentLoadSuccess}
-              loading={<div className="flex justify-center items-center h-full">Loading PDF...</div>}
+              loading={
+                <div className="flex justify-center items-center h-full">
+                  <LoadingSpinner size="large" />
+                  <p className="ml-3">Loading PDF...</p>
+                </div>
+              }
               error={<div className="flex justify-center items-center h-full">Error loading PDF. Please check the file.</div>}
             >
-              <div className="relative">
-                <Page 
-                  pageNumber={pageNumber} 
-                  scale={scale}
-                  width={isMobile ? window.innerWidth - 32 : undefined}
-                  renderTextLayer={true}
-                  renderAnnotationLayer={true}
-                />
-                <AnnotationLayer 
-                  containerRef={containerRef}
-                  activeTool={activeAnnotationTool} 
-                  scale={scale}
-                />
-              </div>
+              {pages}
             </Document>
           </div>
         </>

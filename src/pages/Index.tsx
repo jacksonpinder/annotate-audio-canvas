@@ -22,11 +22,13 @@ export default function Index() {
 
   const handlePdfUpload = (file: File) => {
     setPdfFile(file);
-    setIsFileUploaded(true);
   };
 
   const handleAudioUpload = (file: File) => {
     setAudioFile(file);
+  };
+
+  const handleBothFilesUploaded = () => {
     setIsFileUploaded(true);
   };
 
@@ -72,12 +74,14 @@ export default function Index() {
               <FileUpload 
                 onPdfUpload={handlePdfUpload}
                 onAudioUpload={handleAudioUpload}
+                onBothFilesUploaded={handleBothFilesUploaded}
               />
               
               <div className="mt-8 text-sm text-muted-foreground">
                 <h3 className="font-medium text-base mb-2">How to use:</h3>
                 <ol className="list-decimal pl-5 space-y-1">
                   <li>Upload a PDF document and audio file</li>
+                  <li>Click the Continue button when both files are ready</li>
                   <li>Use the annotation tools to mark up your PDF</li>
                   <li>Play the audio and annotate in sync</li>
                   <li>Use the piano keyboard to add musical notes</li>
