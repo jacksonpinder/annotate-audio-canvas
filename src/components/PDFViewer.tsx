@@ -17,7 +17,6 @@ interface PDFViewerProps {
 
 export default function PDFViewer({ pdfFile }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(null);
-  const [pageNumber, setPageNumber] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.0);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [activeAnnotationTool, setActiveAnnotationTool] = useState<string | null>(null);
@@ -40,20 +39,20 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
-    setPageNumber(1);
     
     // Create an array of Page components
     const pagesArray = Array.from(
       new Array(numPages),
       (_, index) => (
-        <div key={`page_${index + 1}`} className="relative mb-4">
+        <div key={`page_${index + 1}`} className="relative mb-4 pointer-events-none">
           <Page 
             key={`page_${index + 1}`}
             pageNumber={index + 1} 
             scale={scale}
             width={isMobile ? window.innerWidth - 32 : undefined}
-            renderTextLayer={true}
-            renderAnnotationLayer={true}
+            renderTextLayer={false}
+            renderAnnotationLayer={false}
+            className="pointer-events-none"
           />
           <AnnotationLayer 
             containerRef={containerRef}
@@ -82,10 +81,10 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
             scale={scale}
             onZoomIn={() => changeScale(0.1)}
             onZoomOut={() => changeScale(-0.1)}
-            currentPage={pageNumber}
+            currentPage={1}
             totalPages={numPages || 0}
-            onPrevPage={() => setPageNumber(prev => Math.max(1, prev - 1))}
-            onNextPage={() => setPageNumber(prev => Math.min(numPages || 1, prev + 1))}
+            onPrevPage={() => {}} // Empty function as we don't need navigation
+            onNextPage={() => {}} // Empty function as we don't need navigation
           />
           
           <div 

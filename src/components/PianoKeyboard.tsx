@@ -19,7 +19,7 @@ export default function PianoKeyboard() {
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
   const [keys, setKeys] = useState<PianoKey[]>([]);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true); // Always show initially
   const isMobile = useIsMobile();
   
   // Initialize piano keys
@@ -55,8 +55,8 @@ export default function PianoKeyboard() {
     // Scroll to middle C on mount
     scrollToMiddleC();
     
-    // Set up scroll check
-    checkScrollability();
+    // Set up scroll check on a short delay to ensure initial rendering is complete
+    setTimeout(checkScrollability, 300);
     
     // Add event listener for container scroll
     const container = containerRef.current;
@@ -99,7 +99,7 @@ export default function PianoKeyboard() {
   const checkScrollability = () => {
     if (containerRef.current) {
       const container = containerRef.current;
-      setCanScrollLeft(container.scrollLeft > 0);
+      setCanScrollLeft(container.scrollLeft > 10);
       setCanScrollRight(
         container.scrollLeft < container.scrollWidth - container.clientWidth - 10
       );
@@ -139,31 +139,29 @@ export default function PianoKeyboard() {
 
   return (
     <div className="piano-keyboard-container p-2 relative">
-      {/* Left scroll button */}
-      {canScrollLeft && (
-        <Button
-          className="absolute left-0 top-1/2 transform -translate-y-1/2 z-10 rounded-full bg-background/90 shadow-md h-10 w-10 flex items-center justify-center"
-          variant="outline"
-          size="icon"
-          onClick={() => handleScroll('left')}
-          aria-label="Scroll left"
-        >
-          <ChevronLeft size={20} />
-        </Button>
-      )}
+      {/* Left scroll button - always show for clarity */}
+      <Button
+        className={`absolute left-0 top-1/2 transform -translate-y-1/2 z-10 rounded-full bg-background/90 shadow-md h-10 w-10 flex items-center justify-center ${!canScrollLeft ? 'opacity-50' : ''}`}
+        variant="outline"
+        size="icon"
+        onClick={() => handleScroll('left')}
+        aria-label="Scroll left"
+        disabled={!canScrollLeft}
+      >
+        <ChevronLeft size={20} />
+      </Button>
       
-      {/* Right scroll button */}
-      {canScrollRight && (
-        <Button
-          className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 rounded-full bg-background/90 shadow-md h-10 w-10 flex items-center justify-center"
-          variant="outline"
-          size="icon"
-          onClick={() => handleScroll('right')}
-          aria-label="Scroll right"
-        >
-          <ChevronRight size={20} />
-        </Button>
-      )}
+      {/* Right scroll button - always show for clarity */}
+      <Button
+        className={`absolute right-0 top-1/2 transform -translate-y-1/2 z-10 rounded-full bg-background/90 shadow-md h-10 w-10 flex items-center justify-center ${!canScrollRight ? 'opacity-50' : ''}`}
+        variant="outline"
+        size="icon"
+        onClick={() => handleScroll('right')}
+        aria-label="Scroll right"
+        disabled={!canScrollRight}
+      >
+        <ChevronRight size={20} />
+      </Button>
       
       <div 
         ref={containerRef}
@@ -219,7 +217,7 @@ export default function PianoKeyboard() {
                   className={`piano-key absolute black-key 
                     ${activeKeys.has(key.note) ? 'bg-gray-600' : 'bg-black'} 
                     hover:bg-gray-800 active:bg-gray-600 transition-colors
-                    w-6 h-32 cursor-pointer z-10`}
+                    w-6 cursor-pointer z-10`}
                   style={{ left: `${leftOffset}px` }}
                   onClick={() => handlePlayNote(key)}
                   onTouchStart={(e) => {

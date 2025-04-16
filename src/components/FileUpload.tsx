@@ -1,9 +1,8 @@
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { toast } from '@/components/ui/use-toast';
+import { Upload, File, Music } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 interface FileUploadProps {
   onPdfUpload: (file: File) => void;
@@ -14,165 +13,155 @@ interface FileUploadProps {
 export default function FileUpload({ onPdfUpload, onAudioUpload, onBothFilesUploaded }: FileUploadProps) {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  
+  const { toast } = useToast();
 
   const handlePdfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.type === 'application/pdf') {
-        setPdfFile(file);
-        onPdfUpload(file);
-        
-        // Check if both files are now uploaded
-        if (audioFile) {
-          toast({
-            title: "Files uploaded",
-            description: "Both PDF and audio files are ready to use",
-          });
-        }
-      } else {
+      
+      if (file.type !== 'application/pdf') {
         toast({
           title: "Invalid file type",
           description: "Please upload a PDF file",
           variant: "destructive"
         });
+        return;
       }
+      
+      setPdfFile(file);
+      onPdfUpload(file);
+      
+      // Don't automatically proceed when both files are uploaded
     }
   };
-
+  
   const handleAudioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.type.startsWith('audio/')) {
-        setAudioFile(file);
-        onAudioUpload(file);
-        
-        // Check if both files are now uploaded
-        if (pdfFile) {
-          toast({
-            title: "Files uploaded",
-            description: "Both PDF and audio files are ready to use",
-          });
-        }
-      } else {
+      const validAudioTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg'];
+      
+      if (!validAudioTypes.includes(file.type)) {
         toast({
           title: "Invalid file type",
-          description: "Please upload an audio file",
+          description: "Please upload an MP3, WAV, or OGG audio file",
           variant: "destructive"
         });
+        return;
       }
+      
+      setAudioFile(file);
+      onAudioUpload(file);
+      
+      // Don't automatically proceed when both files are uploaded
     }
   };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    
-    if (e.dataTransfer.files) {
-      const pdfFile = Array.from(e.dataTransfer.files).find(file => 
-        file.type === 'application/pdf'
-      );
-      
-      const audioFile = Array.from(e.dataTransfer.files).find(file => 
-        file.type.startsWith('audio/')
-      );
-
-      if (pdfFile) {
-        setPdfFile(pdfFile);
-        onPdfUpload(pdfFile);
-      }
-      
-      if (audioFile) {
-        setAudioFile(audioFile);
-        onAudioUpload(audioFile);
-      }
-      
-      // Check if both files are now uploaded
-      if (pdfFile && audioFile) {
-        toast({
-          title: "Files uploaded",
-          description: "Both PDF and audio files are ready to use",
-        });
-      }
+  
+  const handlePdfButtonClick = () => {
+    if (pdfInputRef.current) {
+      pdfInputRef.current.click();
     }
   };
-
+  
+  const handleAudioButtonClick = () => {
+    if (audioInputRef.current) {
+      audioInputRef.current.click();
+    }
+  };
+  
   const handleContinue = () => {
     if (pdfFile && audioFile) {
       onBothFilesUploaded();
     } else {
       toast({
         title: "Missing files",
-        description: "Please upload both a PDF and an audio file before continuing",
+        description: "Please upload both PDF and audio files before continuing",
         variant: "destructive"
       });
     }
   };
 
   return (
-    <Card 
-      className={`p-6 border-2 border-dashed ${isDragging ? 'border-primary bg-muted' : 'border-muted-foreground'} rounded-lg transition-colors`}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      <div className="text-center space-y-4">
-        <h2 className="text-xl font-semibold">Upload Files</h2>
-        <p className="text-muted-foreground">Drag and drop your files or click to browse</p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <p className="text-sm font-medium">PDF Document</p>
-            <Input
-              id="pdf-upload"
-              type="file"
-              accept="application/pdf"
-              onChange={handlePdfChange}
-              className="cursor-pointer"
-            />
-            {pdfFile && (
-              <p className="text-xs text-muted-foreground truncate">
-                ✓ {pdfFile.name}
-              </p>
-            )}
-          </div>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* PDF Upload */}
+        <div 
+          className={`border-2 ${pdfFile ? 'border-primary/50' : 'border-dashed border-muted-foreground/30'} 
+          rounded-lg p-6 hover:bg-muted/50 transition-colors cursor-pointer`}
+          onClick={handlePdfButtonClick}
+        >
+          <input 
+            type="file" 
+            ref={pdfInputRef} 
+            onChange={handlePdfChange} 
+            accept=".pdf" 
+            className="hidden" 
+            data-testid="pdf-upload"
+          />
           
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Audio File</p>
-            <Input
-              id="audio-upload"
-              type="file"
-              accept="audio/*"
-              onChange={handleAudioChange}
-              className="cursor-pointer"
-            />
-            {audioFile && (
-              <p className="text-xs text-muted-foreground truncate">
-                ✓ {audioFile.name}
-              </p>
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <div className="p-3 rounded-full bg-primary/10">
+              <File className="h-8 w-8 text-primary" />
+            </div>
+            
+            <div className="text-center">
+              <h3 className="font-medium">Upload PDF Document</h3>
+              <p className="text-sm text-muted-foreground">Drag and drop or click to browse</p>
+            </div>
+            
+            {pdfFile && (
+              <div className="bg-primary/10 text-primary font-medium rounded-full px-3 py-1 text-sm">
+                {pdfFile.name}
+              </div>
             )}
           </div>
         </div>
         
-        <div className="mt-6">
-          <Button 
-            onClick={handleContinue}
-            disabled={!pdfFile || !audioFile}
-            className="w-full md:w-auto"
-          >
-            Continue to Annotation
-          </Button>
+        {/* Audio Upload */}
+        <div 
+          className={`border-2 ${audioFile ? 'border-primary/50' : 'border-dashed border-muted-foreground/30'} 
+          rounded-lg p-6 hover:bg-muted/50 transition-colors cursor-pointer`}
+          onClick={handleAudioButtonClick}
+        >
+          <input 
+            type="file" 
+            ref={audioInputRef} 
+            onChange={handleAudioChange} 
+            accept=".mp3,.wav,.ogg" 
+            className="hidden" 
+            data-testid="audio-upload"
+          />
+          
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <div className="p-3 rounded-full bg-primary/10">
+              <Music className="h-8 w-8 text-primary" />
+            </div>
+            
+            <div className="text-center">
+              <h3 className="font-medium">Upload Audio File</h3>
+              <p className="text-sm text-muted-foreground">MP3, WAV, or OGG format</p>
+            </div>
+            
+            {audioFile && (
+              <div className="bg-primary/10 text-primary font-medium rounded-full px-3 py-1 text-sm">
+                {audioFile.name}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </Card>
+      
+      <Button 
+        className="w-full" 
+        onClick={handleContinue} 
+        disabled={!pdfFile || !audioFile}
+      >
+        <Upload className="mr-2 h-4 w-4" />
+        Continue
+      </Button>
+    </div>
   );
 }

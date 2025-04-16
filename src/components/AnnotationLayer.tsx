@@ -58,24 +58,33 @@ export default function AnnotationLayer({ containerRef, activeTool, scale, pageN
   // Resize canvas when container size changes
   useEffect(() => {
     const resizeCanvas = () => {
-      if (canvasRef.current) {
+      if (canvasRef.current && containerRef.current) {
         const canvas = canvasRef.current;
-        const parent = canvas.parentElement;
+        const parent = containerRef.current.querySelector(`div[key="page_${pageNumber}"]`);
+        
         if (parent) {
-          canvas.width = parent.clientWidth;
-          canvas.height = parent.clientHeight;
+          const rect = parent.getBoundingClientRect();
+          canvas.width = rect.width;
+          canvas.height = rect.height;
+          canvas.style.width = `${rect.width}px`;
+          canvas.style.height = `${rect.height}px`;
+          canvas.style.position = 'absolute';
+          canvas.style.top = `${parent.getBoundingClientRect().top - containerRef.current.getBoundingClientRect().top}px`;
+          canvas.style.left = '0';
+          canvas.style.pointerEvents = 'auto';
           renderAnnotations();
         }
       }
     };
 
     window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
+    const timeout = setTimeout(resizeCanvas, 500); // Slight delay to ensure container is mounted
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
+      clearTimeout(timeout);
     };
-  }, []);
+  }, [containerRef, pageNumber]);
 
   // Filter annotations for current page and re-render when scale changes
   useEffect(() => {
@@ -105,6 +114,10 @@ export default function AnnotationLayer({ containerRef, activeTool, scale, pageN
 
   function handleMouseDown(e: React.MouseEvent) {
     if (!activeTool || !canvasRef.current) return;
+    
+    // Prevent default to stop PDF selection
+    e.preventDefault();
+    e.stopPropagation();
     
     const position = getMousePosition(e);
     
@@ -145,6 +158,10 @@ export default function AnnotationLayer({ containerRef, activeTool, scale, pageN
   function handleMouseMove(e: React.MouseEvent) {
     if (!isDrawing || !currentAnnotation || !canvasRef.current) return;
     
+    // Prevent default to stop PDF selection
+    e.preventDefault();
+    e.stopPropagation();
+    
     const position = getMousePosition(e);
     
     if (currentAnnotation.type === 'freehand') {
@@ -175,8 +192,12 @@ export default function AnnotationLayer({ containerRef, activeTool, scale, pageN
     }
   }
 
-  function handleMouseUp() {
+  function handleMouseUp(e: React.MouseEvent) {
     if (!isDrawing || !currentAnnotation) return;
+    
+    // Prevent default to stop PDF selection
+    e.preventDefault();
+    e.stopPropagation();
     
     setIsDrawing(false);
     setAnnotations([...annotations, currentAnnotation]);
@@ -323,6 +344,7 @@ export default function AnnotationLayer({ containerRef, activeTool, scale, pageN
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        style={{pointerEvents: 'auto'}}
       />
       
       {editingText && (

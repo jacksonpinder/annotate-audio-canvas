@@ -3,8 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { 
-  Play, Pause, Rewind, FastForward, Repeat, Volume2, Volume1, VolumeX, Piano, 
-  ChevronLeft, ChevronRight
+  Play, Pause, Rewind, FastForward, Repeat, Volume2, VolumeX, Piano
 } from 'lucide-react';
 import PianoKeyboard from './PianoKeyboard';
 
@@ -121,30 +120,6 @@ export default function AudioPlayer({ audioFile }: AudioPlayerProps) {
     }
   };
 
-  // Cycle through volume levels
-  const cycleVolume = () => {
-    if (!audioRef.current) return;
-    
-    if (isMuted) {
-      // If muted, unmute and set to medium volume
-      audioRef.current.volume = 0.5;
-      setVolume(0.5);
-      setIsMuted(false);
-    } else if (volume > 0.7) {
-      // If high volume, set to medium
-      audioRef.current.volume = 0.5;
-      setVolume(0.5);
-    } else if (volume > 0.3) {
-      // If medium volume, set to low
-      audioRef.current.volume = 0.2;
-      setVolume(0.2);
-    } else {
-      // If low volume, mute
-      audioRef.current.volume = 0;
-      setIsMuted(true);
-    }
-  };
-
   // Toggle loop
   const toggleLoop = () => {
     if (!audioRef.current) return;
@@ -177,16 +152,9 @@ export default function AudioPlayer({ audioFile }: AudioPlayerProps) {
     
     setDuration(audioRef.current.duration);
   };
-  
-  // Get appropriate volume icon
-  const getVolumeIcon = () => {
-    if (isMuted) return <VolumeX size={20} />;
-    if (volume < 0.5) return <Volume1 size={20} />;
-    return <Volume2 size={20} />;
-  };
 
   return (
-    <div className={`audio-player-container ${showPiano ? 'pb-72 transition-all duration-300' : 'transition-all duration-300'}`}>
+    <div className={`audio-player-container ${showPiano ? 'piano-open' : ''}`}>
       <div className="audio-player bg-muted p-3 rounded-md shadow-md">
         {audioUrl ? (
           <>
@@ -212,15 +180,18 @@ export default function AudioPlayer({ audioFile }: AudioPlayerProps) {
               </Button>
               
               {/* Rewind 15 seconds */}
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => skip(-15)}
-                aria-label="Rewind 15 seconds"
-                className="flex-shrink-0"
-              >
-                <Rewind size={20} />
-              </Button>
+              <div className="flex flex-col items-center flex-shrink-0">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => skip(-15)}
+                  aria-label="Rewind 15 seconds"
+                  className="flex-shrink-0 h-8"
+                >
+                  <Rewind size={18} />
+                </Button>
+                <span className="text-[9px] mt-[-2px] text-muted-foreground">15 sec</span>
+              </div>
               
               {/* Current Time */}
               <span className="text-xs text-muted-foreground flex-shrink-0">
@@ -245,25 +216,28 @@ export default function AudioPlayer({ audioFile }: AudioPlayerProps) {
               </span>
               
               {/* Fast Forward 15 seconds */}
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => skip(15)}
-                aria-label="Fast forward 15 seconds"
-                className="flex-shrink-0"
-              >
-                <FastForward size={20} />
-              </Button>
+              <div className="flex flex-col items-center flex-shrink-0">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => skip(15)}
+                  aria-label="Fast forward 15 seconds"
+                  className="flex-shrink-0 h-8"
+                >
+                  <FastForward size={18} />
+                </Button>
+                <span className="text-[9px] mt-[-2px] text-muted-foreground">15 sec</span>
+              </div>
               
-              {/* Volume Button */}
+              {/* Volume/Mute Button */}
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={cycleVolume}
-                aria-label="Volume control"
+                onClick={toggleMute}
+                aria-label={isMuted ? "Unmute" : "Mute"}
                 className="flex-shrink-0"
               >
-                {getVolumeIcon()}
+                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
               </Button>
               
               {/* Loop Button */}
@@ -298,7 +272,7 @@ export default function AudioPlayer({ audioFile }: AudioPlayerProps) {
 
       {/* Piano Keyboard */}
       <div 
-        className={`piano-container fixed bottom-0 left-0 right-0 bg-background border-t transition-transform duration-300 ease-in-out ${
+        className={`piano-container transition-transform duration-300 ease-in-out ${
           showPiano ? 'translate-y-0' : 'translate-y-full'
         }`}
       >
