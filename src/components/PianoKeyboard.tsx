@@ -26,7 +26,7 @@ export default function PianoKeyboard() {
   useEffect(() => {
     const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     const startOctave = 2; // Start from C2
-    const endOctave = 7;   // End with B7
+    const endOctave = 6;   // End with C6
     
     const pianoKeys: PianoKey[] = [];
     
@@ -34,6 +34,10 @@ export default function PianoKeyboard() {
       for (let noteIdx = 0; noteIdx < notes.length; noteIdx++) {
         const note = notes[noteIdx];
         const fullNote = `${note}${octave}`;
+        
+        // Only add the C6 note when we reach the highest octave, skip other notes
+        if (octave === endOctave && note !== 'C') continue;
+        
         const isBlack = note.includes('#');
         const isMiddleC = note === 'C' && octave === 4; // C4 is middle C
         
@@ -106,16 +110,18 @@ export default function PianoKeyboard() {
     }
   };
 
-  // Handle scroll button clicks
+  // Handle scroll button clicks - now scrolls by one octave (12 notes)
   const handleScroll = (direction: 'left' | 'right') => {
     if (containerRef.current) {
       const container = containerRef.current;
-      const scrollAmount = container.clientWidth * 0.75;
+      // Calculate width of one octave (12 white keys)
+      const whiteKeyWidth = 48; // Width of one white key
+      const octaveWidth = whiteKeyWidth * 7; // 7 white keys in an octave
       
       if (direction === 'left') {
-        container.scrollLeft -= scrollAmount;
+        container.scrollLeft -= octaveWidth;
       } else {
-        container.scrollLeft += scrollAmount;
+        container.scrollLeft += octaveWidth;
       }
       
       checkScrollability();
@@ -139,25 +145,24 @@ export default function PianoKeyboard() {
 
   return (
     <div className="piano-keyboard-container p-2 relative">
-      {/* Left scroll button - always show for clarity */}
+      {/* Always show scroll buttons */}
       <Button
         className={`absolute left-0 top-1/2 transform -translate-y-1/2 z-10 rounded-full bg-background/90 shadow-md h-10 w-10 flex items-center justify-center ${!canScrollLeft ? 'opacity-50' : ''}`}
         variant="outline"
         size="icon"
         onClick={() => handleScroll('left')}
-        aria-label="Scroll left"
+        aria-label="Scroll left one octave"
         disabled={!canScrollLeft}
       >
         <ChevronLeft size={20} />
       </Button>
       
-      {/* Right scroll button - always show for clarity */}
       <Button
         className={`absolute right-0 top-1/2 transform -translate-y-1/2 z-10 rounded-full bg-background/90 shadow-md h-10 w-10 flex items-center justify-center ${!canScrollRight ? 'opacity-50' : ''}`}
         variant="outline"
         size="icon"
         onClick={() => handleScroll('right')}
-        aria-label="Scroll right"
+        aria-label="Scroll right one octave"
         disabled={!canScrollRight}
       >
         <ChevronRight size={20} />
@@ -199,7 +204,7 @@ export default function PianoKeyboard() {
             ))}
           </div>
           
-          {/* Black keys as overlay - with improved positioning */}
+          {/* Black keys as overlay - with improved positioning and width */}
           <div className="absolute top-0 left-0 flex">
             {keys.map((key, index) => {
               if (!key.isBlack) return null;
@@ -217,7 +222,7 @@ export default function PianoKeyboard() {
                   className={`piano-key absolute black-key 
                     ${activeKeys.has(key.note) ? 'bg-gray-600' : 'bg-black'} 
                     hover:bg-gray-800 active:bg-gray-600 transition-colors
-                    w-6 cursor-pointer z-10`}
+                    w-[24px] cursor-pointer z-10`}
                   style={{ left: `${leftOffset}px` }}
                   onClick={() => handlePlayNote(key)}
                   onTouchStart={(e) => {

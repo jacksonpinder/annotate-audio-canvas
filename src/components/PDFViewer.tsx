@@ -1,8 +1,8 @@
-
 import { useEffect, useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
+// Keeping imports but not using the toolbar
 import AnnotationToolbar from './AnnotationToolbar';
 import AnnotationLayer from './AnnotationLayer';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -75,7 +75,8 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
     <div className="pdf-viewer-container flex flex-col h-full">
       {pdfUrl ? (
         <>
-          <AnnotationToolbar 
+          {/* Annotation toolbar is commented out as requested */}
+          {/* <AnnotationToolbar 
             activeTool={activeAnnotationTool}
             setActiveTool={setActiveAnnotationTool}
             scale={scale}
@@ -83,9 +84,9 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
             onZoomOut={() => changeScale(-0.1)}
             currentPage={1}
             totalPages={numPages || 0}
-            onPrevPage={() => {}} // Empty function as we don't need navigation
-            onNextPage={() => {}} // Empty function as we don't need navigation
-          />
+            onPrevPage={() => {}} 
+            onNextPage={() => {}} 
+          /> */}
           
           <div 
             ref={containerRef}
