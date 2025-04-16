@@ -2,7 +2,7 @@
 import { useRef, useState, useEffect, RefObject } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import Draggable from 'react-draggable';
-import { RoughCanvas } from 'rough';
+import rough from 'roughjs/bundled/rough.esm';
 
 interface Point {
   x: number;
@@ -200,8 +200,8 @@ export default function AnnotationLayer({ containerRef, activeTool, scale }: Ann
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Create RoughCanvas for shape drawing
-    const roughCanvas = new RoughCanvas(canvas);
+    // Create RoughCanvas instance using the updated import
+    const roughCanvas = rough.canvas(canvas);
     
     // Draw all annotations
     annotations.forEach(annotation => {
@@ -221,7 +221,7 @@ export default function AnnotationLayer({ containerRef, activeTool, scale }: Ann
         
         ctx.stroke();
       } else if (annotation.type === 'shape') {
-        const { start, end, color, width } = annotation;
+        const { start, end, color, width: lineWidth } = annotation;
         
         if (annotation.shape === 'rectangle') {
           roughCanvas.rectangle(
@@ -231,7 +231,7 @@ export default function AnnotationLayer({ containerRef, activeTool, scale }: Ann
             end.y - start.y,
             {
               stroke: color,
-              strokeWidth: width,
+              strokeWidth: lineWidth,
               fill: 'transparent',
               fillStyle: 'solid'
             }
@@ -249,7 +249,7 @@ export default function AnnotationLayer({ containerRef, activeTool, scale }: Ann
             height,
             {
               stroke: color,
-              strokeWidth: width,
+              strokeWidth: lineWidth,
               fill: 'transparent',
               fillStyle: 'solid'
             }
@@ -264,7 +264,7 @@ export default function AnnotationLayer({ containerRef, activeTool, scale }: Ann
     
     // Draw current shape if drawing
     if (isDrawing && currentAnnotation && currentAnnotation.type === 'shape') {
-      const { start, end, color, width } = currentAnnotation;
+      const { start, end, color, width: lineWidth } = currentAnnotation;
       
       if (currentAnnotation.shape === 'rectangle') {
         roughCanvas.rectangle(
@@ -274,7 +274,7 @@ export default function AnnotationLayer({ containerRef, activeTool, scale }: Ann
           end.y - start.y,
           {
             stroke: color,
-            strokeWidth: width,
+            strokeWidth: lineWidth,
             fill: 'transparent',
             fillStyle: 'solid'
           }
@@ -292,7 +292,7 @@ export default function AnnotationLayer({ containerRef, activeTool, scale }: Ann
           height,
           {
             stroke: color,
-            strokeWidth: width,
+            strokeWidth: lineWidth,
             fill: 'transparent',
             fillStyle: 'solid'
           }

@@ -6,6 +6,7 @@ declare module 'react-pdf' {
   export const pdfjs: any;
 }
 
-declare module 'rough' {
-  export const RoughCanvas: any;
+declare module 'roughjs/bundled/rough.esm' {
+  const rough: any;
+  export default rough;
 }
