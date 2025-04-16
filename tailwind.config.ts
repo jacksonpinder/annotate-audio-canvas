@@ -52,6 +52,13 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				piano: {
+          key: '#ffffff',
+          black: '#000000',
+          hover: '#f3f4f6',
+          active: '#e5e7eb',
+          middleC: '#4f46e5',
+        },
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
