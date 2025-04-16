@@ -49,25 +49,8 @@ export default function Index() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-primary text-primary-foreground p-4 shadow-md">
-        <div className="container mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold">Audio PDF Annotator</h1>
-            <p className="text-sm md:text-base text-primary-foreground/80">Annotate PDFs while listening to audio</p>
-          </div>
-          {isFileUploaded && (
-            <button 
-              onClick={handleReset}
-              className="text-primary-foreground/90 hover:text-primary-foreground text-sm px-3 py-1 rounded-md bg-primary-foreground/10 hover:bg-primary-foreground/20 transition-colors"
-            >
-              Upload New Files
-            </button>
-          )}
-        </div>
-      </header>
-
-      <main className="flex-grow container mx-auto p-4 flex flex-col">
-        {!isFileUploaded ? (
+      {!isFileUploaded ? (
+        <main className="flex-grow container mx-auto p-4 flex flex-col">
           <div className="flex-grow flex flex-col justify-center items-center">
             <div className="max-w-xl w-full">
               <h2 className="text-2xl font-semibold mb-6 text-center">Get Started</h2>
@@ -89,18 +72,20 @@ export default function Index() {
               </div>
             </div>
           </div>
-        ) : (
+        </main>
+      ) : (
+        <main className="flex-grow container mx-auto p-4 flex flex-col">
           <div className="grid grid-rows-[1fr,auto] h-full gap-4">
             <div className="pdf-container flex-grow overflow-hidden">
               <PDFViewer pdfFile={pdfFile} />
             </div>
             
             <div className="audio-container sticky bottom-0 left-0 right-0 z-10">
-              <AudioPlayer audioFile={audioFile} />
+              <AudioPlayer audioFile={audioFile} onHomeClick={handleReset} />
             </div>
           </div>
-        )}
-      </main>
+        </main>
+      )}
       
       <footer className="bg-muted py-3 text-center text-sm text-muted-foreground">
         <p>Audio PDF Annotator &copy; {new Date().getFullYear()}</p>

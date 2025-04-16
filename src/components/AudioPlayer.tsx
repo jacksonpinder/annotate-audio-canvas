@@ -3,15 +3,16 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { 
-  Play, Pause, Rewind, FastForward, Repeat, Volume2, VolumeX, Piano
+  Play, Pause, Rewind, FastForward, Repeat, Volume2, VolumeX, Piano, Home
 } from 'lucide-react';
 import PianoKeyboard from './PianoKeyboard';
 
 interface AudioPlayerProps {
   audioFile: File | null;
+  onHomeClick?: () => void;
 }
 
-export default function AudioPlayer({ audioFile }: AudioPlayerProps) {
+export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -168,6 +169,17 @@ export default function AudioPlayer({ audioFile }: AudioPlayerProps) {
             />
             
             <div className="flex items-center space-x-2 md:space-x-3">
+              {/* Home Button */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={onHomeClick}
+                aria-label="Return to home screen"
+                className="flex-shrink-0"
+              >
+                <Home size={20} />
+              </Button>
+              
               {/* Play/Pause Button */}
               <Button 
                 variant="ghost" 
