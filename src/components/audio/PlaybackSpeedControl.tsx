@@ -1,7 +1,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Stopwatch } from 'lucide-react';
+import { Clock } from 'lucide-react';  // Changed from Stopwatch to Clock
 import { cn } from '@/lib/utils';
 
 interface PlaybackSpeedControlProps {
@@ -43,7 +43,7 @@ export default function PlaybackSpeedControl({
         )}
       >
         <div className="relative">
-          <Stopwatch size={20} />
+          <Clock size={20} />  {/* Replaced Stopwatch with Clock */}
           {speed !== 1 && (
             <span className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 text-[10px] font-medium">
               {speed}x
