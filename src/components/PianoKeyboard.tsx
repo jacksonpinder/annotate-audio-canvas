@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import * as Tone from 'tone';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -45,7 +44,7 @@ export default function PianoKeyboard() {
           note: fullNote,
           frequency: Tone.Frequency(fullNote).toFrequency(),
           isBlack,
-          label: isMiddleC ? 'C4' : (isBlack ? '' : note),
+          label: isMiddleC ? 'C' : (isBlack ? '' : note),
           isMiddleC
         });
       }
@@ -86,12 +85,17 @@ export default function PianoKeyboard() {
           const middleCElement = keyElements[middleCIndex];
           
           if (middleCElement) {
-            const scrollOffset = middleCElement.getBoundingClientRect().left - 
-                               containerRef.current.getBoundingClientRect().left -
-                               (containerRef.current.clientWidth / 2) +
-                               (middleCElement as HTMLElement).offsetWidth / 2;
+            // Calculate the total width of all keys
+            const totalKeysWidth = containerRef.current.scrollWidth;
+            // Calculate the container's visible width
+            const containerWidth = containerRef.current.clientWidth;
+            // Calculate the middle C position relative to the start of the piano
+            const middleCPosition = (middleCElement as HTMLElement).offsetLeft;
             
-            containerRef.current.scrollLeft = scrollOffset;
+            // Center middle C by considering both the container width and total piano width
+            const scrollOffset = middleCPosition - (containerWidth / 2) + ((middleCElement as HTMLElement).offsetWidth / 2);
+            
+            containerRef.current.scrollLeft = Math.max(0, Math.min(scrollOffset, totalKeysWidth - containerWidth));
             checkScrollability();
           }
         }
@@ -103,12 +107,26 @@ export default function PianoKeyboard() {
   const checkScrollability = () => {
     if (containerRef.current) {
       const container = containerRef.current;
-      setCanScrollLeft(container.scrollLeft > 10);
-      setCanScrollRight(
-        container.scrollLeft < container.scrollWidth - container.clientWidth - 10
-      );
+      const hasScrollLeft = container.scrollLeft > 0;
+      const hasScrollRight = container.scrollLeft < (container.scrollWidth - container.clientWidth);
+      
+      setCanScrollLeft(hasScrollLeft);
+      setCanScrollRight(hasScrollRight);
     }
   };
+
+  // Add resize observer to handle window resizing
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      checkScrollability();
+    });
+
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   // Handle scroll button clicks - now scrolls by one octave (12 notes)
   const handleScroll = (direction: 'left' | 'right') => {
@@ -145,95 +163,102 @@ export default function PianoKeyboard() {
 
   return (
     <div className="piano-keyboard-container p-2 relative">
-      {/* Always show scroll buttons */}
-      <Button
-        className={`absolute left-0 top-1/2 transform -translate-y-1/2 z-10 rounded-full bg-background/90 shadow-md h-10 w-10 flex items-center justify-center ${!canScrollLeft ? 'opacity-50' : ''}`}
-        variant="outline"
-        size="icon"
-        onClick={() => handleScroll('left')}
-        aria-label="Scroll left one octave"
-        disabled={!canScrollLeft}
-      >
-        <ChevronLeft size={20} />
-      </Button>
-      
-      <Button
-        className={`absolute right-0 top-1/2 transform -translate-y-1/2 z-10 rounded-full bg-background/90 shadow-md h-10 w-10 flex items-center justify-center ${!canScrollRight ? 'opacity-50' : ''}`}
-        variant="outline"
-        size="icon"
-        onClick={() => handleScroll('right')}
-        aria-label="Scroll right one octave"
-        disabled={!canScrollRight}
-      >
-        <ChevronRight size={20} />
-      </Button>
-      
-      <div 
-        ref={containerRef}
-        className="piano-keyboard max-h-72 overflow-x-auto flex relative"
-        style={{ 
-          touchAction: isMobile ? 'pan-y' : 'auto',
-          height: '220px',
-          scrollBehavior: 'smooth'
-        }}
-      >
-        <div className="flex relative">
-          {/* White keys as base layer */}
-          <div className="flex">
-            {keys.filter(key => !key.isBlack).map((key, index) => (
-              <div
-                key={key.note}
-                className={`piano-key relative select-none white-key 
-                  ${activeKeys.has(key.note) ? 'bg-primary/20' : 'bg-white'} 
-                  ${key.isMiddleC ? 'border-primary border-2' : 'border border-gray-300'}
-                  hover:bg-primary/10 active:bg-primary/20 transition-colors
-                  w-12 h-full flex flex-col items-center justify-end pb-2 cursor-pointer`}
-                onClick={() => handlePlayNote(key)}
-                onTouchStart={(e) => {
-                  e.preventDefault();
-                  handlePlayNote(key);
-                }}
-              >
-                <span className="text-xs text-gray-500">{key.label}</span>
-                {key.isMiddleC && (
-                  <span className="text-[8px] text-primary font-bold absolute bottom-8">
-                    Middle C
-                  </span>
-                )}
+      <div className="container mx-auto px-4 relative">
+        <div className="flex justify-center">
+          <div 
+            ref={containerRef}
+            className="piano-keyboard overflow-x-auto flex relative"
+            style={{ 
+              touchAction: isMobile ? 'pan-y' : 'auto',
+              height: '180px',
+              scrollBehavior: 'smooth',
+              maxWidth: '100%'
+            }}
+          >
+            <div className="flex relative">
+              {/* White keys as base layer */}
+              <div className="flex">
+                {keys.filter(key => !key.isBlack).map((key, index) => (
+                  <div
+                    key={key.note}
+                    className={`piano-key relative select-none white-key 
+                      ${activeKeys.has(key.note) ? 'bg-primary/20' : 'bg-white'} 
+                      ${key.isMiddleC ? 'border-primary border-2' : 'border border-gray-300'}
+                      hover:bg-primary/10 active:bg-primary/20 transition-colors
+                      w-12 h-full flex flex-col items-center justify-end pb-2 cursor-pointer`}
+                    onClick={() => handlePlayNote(key)}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      handlePlayNote(key);
+                    }}
+                  >
+                    <span className="text-xs text-gray-500">{key.label}</span>
+                    {key.isMiddleC && (
+                      <span className="text-[8px] text-primary font-bold absolute bottom-8">
+                        Middle
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          
-          {/* Black keys as overlay - with improved positioning and width */}
-          <div className="absolute top-0 left-0 flex">
-            {keys.map((key, index) => {
-              if (!key.isBlack) return null;
               
-              // Find the white keys before and after this black key
-              const whiteKeysBefore = keys.filter((k, i) => !k.isBlack && i < index);
-              const whiteKeyIndex = whiteKeysBefore.length;
-              
-              // Position based on white key index
-              const leftOffset = (whiteKeyIndex * 48) - 12; // 48px = width of white key (w-12)
-              
-              return (
-                <div
-                  key={key.note}
-                  className={`piano-key absolute black-key 
-                    ${activeKeys.has(key.note) ? 'bg-gray-600' : 'bg-black'} 
-                    hover:bg-gray-800 active:bg-gray-600 transition-colors
-                    w-[24px] cursor-pointer z-10`}
-                  style={{ left: `${leftOffset}px` }}
-                  onClick={() => handlePlayNote(key)}
-                  onTouchStart={(e) => {
-                    e.preventDefault();
-                    handlePlayNote(key);
-                  }}
-                />
-              );
-            })}
+              {/* Black keys as overlay - with improved positioning and width */}
+              <div className="absolute top-0 left-0 flex">
+                {keys.map((key, index) => {
+                  if (!key.isBlack) return null;
+                  
+                  // Find the white keys before and after this black key
+                  const whiteKeysBefore = keys.filter((k, i) => !k.isBlack && i < index);
+                  const whiteKeyIndex = whiteKeysBefore.length;
+                  
+                  // Position based on white key index
+                  const leftOffset = (whiteKeyIndex * 48) - 12; // 48px = width of white key (w-12)
+                  
+                  return (
+                    <div
+                      key={key.note}
+                      className={`piano-key absolute black-key 
+                        ${activeKeys.has(key.note) ? 'bg-gray-600' : 'bg-black'} 
+                        hover:bg-gray-800 active:bg-gray-600 transition-colors
+                        w-[24px] cursor-pointer z-10`}
+                      style={{ left: `${leftOffset}px` }}
+                      onClick={() => handlePlayNote(key)}
+                      onTouchStart={(e) => {
+                        e.preventDefault();
+                        handlePlayNote(key);
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
+        
+        {/* Scroll buttons positioned relative to the container */}
+        {canScrollLeft && (
+          <Button
+            className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 rounded-full bg-background/90 shadow-md h-10 w-10 flex items-center justify-center transition-opacity duration-200"
+            variant="outline"
+            size="icon"
+            onClick={() => handleScroll('left')}
+            aria-label="Scroll left one octave"
+          >
+            <ChevronLeft size={20} />
+          </Button>
+        )}
+        
+        {canScrollRight && (
+          <Button
+            className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 rounded-full bg-background/90 shadow-md h-10 w-10 flex items-center justify-center transition-opacity duration-200"
+            variant="outline"
+            size="icon"
+            onClick={() => handleScroll('right')}
+            aria-label="Scroll right one octave"
+          >
+            <ChevronRight size={20} />
+          </Button>
+        )}
       </div>
     </div>
   );

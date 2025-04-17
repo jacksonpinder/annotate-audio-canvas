@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload, File, Music } from 'lucide-react';
@@ -13,6 +12,8 @@ interface FileUploadProps {
 export default function FileUpload({ onPdfUpload, onAudioUpload, onBothFilesUploaded }: FileUploadProps) {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [isPdfDragging, setIsPdfDragging] = useState(false);
+  const [isAudioDragging, setIsAudioDragging] = useState(false);
   
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +72,102 @@ export default function FileUpload({ onPdfUpload, onAudioUpload, onBothFilesUplo
       audioInputRef.current.click();
     }
   };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handlePdfDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsPdfDragging(true);
+  };
+
+  const handlePdfDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Check if we're actually leaving the container
+    const rect = e.currentTarget.getBoundingClientRect();
+    const { clientX, clientY } = e;
+    
+    if (
+      clientX <= rect.left ||
+      clientX >= rect.right ||
+      clientY <= rect.top ||
+      clientY >= rect.bottom
+    ) {
+      setIsPdfDragging(false);
+    }
+  };
+
+  const handleAudioDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsAudioDragging(true);
+  };
+
+  const handleAudioDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Check if we're actually leaving the container
+    const rect = e.currentTarget.getBoundingClientRect();
+    const { clientX, clientY } = e;
+    
+    if (
+      clientX <= rect.left ||
+      clientX >= rect.right ||
+      clientY <= rect.top ||
+      clientY >= rect.bottom
+    ) {
+      setIsAudioDragging(false);
+    }
+  };
+
+  const handlePdfDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsPdfDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      
+      if (file.type !== 'application/pdf') {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload a PDF file",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setPdfFile(file);
+      onPdfUpload(file);
+    }
+  };
+
+  const handleAudioDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsAudioDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      const validAudioTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg'];
+      
+      if (!validAudioTypes.includes(file.type)) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload an MP3, WAV, or OGG audio file",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setAudioFile(file);
+      onAudioUpload(file);
+    }
+  };
   
   const handleContinue = () => {
     if (pdfFile && audioFile) {
@@ -89,10 +186,22 @@ export default function FileUpload({ onPdfUpload, onAudioUpload, onBothFilesUplo
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* PDF Upload */}
         <div 
-          className={`border-2 ${pdfFile ? 'border-primary/50' : 'border-dashed border-muted-foreground/30'} 
-          rounded-lg p-6 hover:bg-muted/50 transition-colors cursor-pointer`}
+          className={`relative border-2 ${
+            isPdfDragging 
+              ? 'border-primary bg-primary/5' 
+              : pdfFile 
+                ? 'border-primary/50' 
+                : 'border-dashed border-muted-foreground/30'
+          } rounded-lg p-6 hover:bg-muted/50 transition-all duration-200 cursor-pointer`}
           onClick={handlePdfButtonClick}
+          onDrop={handlePdfDrop}
+          onDragOver={handleDragOver}
+          onDragEnter={handlePdfDragEnter}
+          onDragLeave={handlePdfDragLeave}
         >
+          {isPdfDragging && (
+            <div className="absolute inset-0 bg-primary/5 rounded-lg" />
+          )}
           <input 
             type="file" 
             ref={pdfInputRef} 
@@ -102,14 +211,16 @@ export default function FileUpload({ onPdfUpload, onAudioUpload, onBothFilesUplo
             data-testid="pdf-upload"
           />
           
-          <div className="flex flex-col items-center justify-center space-y-3">
-            <div className="p-3 rounded-full bg-primary/10">
-              <File className="h-8 w-8 text-primary" />
+          <div className="flex flex-col items-center justify-center space-y-3 relative">
+            <div className={`p-3 rounded-full ${isPdfDragging ? 'bg-primary/20' : 'bg-primary/10'}`}>
+              <File className={`h-8 w-8 ${isPdfDragging ? 'text-primary scale-110' : 'text-primary'}`} />
             </div>
             
             <div className="text-center">
               <h3 className="font-medium">Upload PDF Document</h3>
-              <p className="text-sm text-muted-foreground">Drag and drop or click to browse</p>
+              <p className="text-sm text-muted-foreground">
+                {isPdfDragging ? 'Drop your PDF here' : 'Drag and drop or click to browse'}
+              </p>
             </div>
             
             {pdfFile && (
@@ -122,10 +233,22 @@ export default function FileUpload({ onPdfUpload, onAudioUpload, onBothFilesUplo
         
         {/* Audio Upload */}
         <div 
-          className={`border-2 ${audioFile ? 'border-primary/50' : 'border-dashed border-muted-foreground/30'} 
-          rounded-lg p-6 hover:bg-muted/50 transition-colors cursor-pointer`}
+          className={`relative border-2 ${
+            isAudioDragging 
+              ? 'border-primary bg-primary/5' 
+              : audioFile 
+                ? 'border-primary/50' 
+                : 'border-dashed border-muted-foreground/30'
+          } rounded-lg p-6 hover:bg-muted/50 transition-all duration-200 cursor-pointer`}
           onClick={handleAudioButtonClick}
+          onDrop={handleAudioDrop}
+          onDragOver={handleDragOver}
+          onDragEnter={handleAudioDragEnter}
+          onDragLeave={handleAudioDragLeave}
         >
+          {isAudioDragging && (
+            <div className="absolute inset-0 bg-primary/5 rounded-lg" />
+          )}
           <input 
             type="file" 
             ref={audioInputRef} 
@@ -135,14 +258,16 @@ export default function FileUpload({ onPdfUpload, onAudioUpload, onBothFilesUplo
             data-testid="audio-upload"
           />
           
-          <div className="flex flex-col items-center justify-center space-y-3">
-            <div className="p-3 rounded-full bg-primary/10">
-              <Music className="h-8 w-8 text-primary" />
+          <div className="flex flex-col items-center justify-center space-y-3 relative">
+            <div className={`p-3 rounded-full ${isAudioDragging ? 'bg-primary/20' : 'bg-primary/10'}`}>
+              <Music className={`h-8 w-8 ${isAudioDragging ? 'text-primary scale-110' : 'text-primary'}`} />
             </div>
             
             <div className="text-center">
               <h3 className="font-medium">Upload Audio File</h3>
-              <p className="text-sm text-muted-foreground">MP3, WAV, or OGG format</p>
+              <p className="text-sm text-muted-foreground">
+                {isAudioDragging ? 'Drop your audio file here' : 'MP3, WAV, or OGG format'}
+              </p>
             </div>
             
             {audioFile && (
