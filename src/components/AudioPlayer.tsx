@@ -1,10 +1,11 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Home } from 'lucide-react';
 import PianoKeyboard from './PianoKeyboard';
 import { useAudioBalance } from '@/hooks/useAudioBalance';
 import { usePlaybackSpeed } from '@/hooks/usePlaybackSpeed';
+import TransposeControl from './audio/TransposeControl';
+import { useTranspose } from '@/hooks/useTranspose';
 
 // Import our new component modules
 import AudioTransportControls from './audio/AudioTransportControls';
@@ -55,6 +56,19 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
     resetSpeed,
     speedToSliderValue
   } = usePlaybackSpeed(audioRef);
+
+  // Initialize the transpose hook
+  const {
+    transpose,
+    tempTranspose,
+    isTransposeVisible,
+    showTranspose,
+    scheduleHideTranspose,
+    hideTransposeImmediate,
+    handleTempTransposeChange,
+    applyTranspose,
+    resetTranspose
+  } = useTranspose(audioRef);
 
   // Convert the File to a URL for audio element
   useEffect(() => {
@@ -220,7 +234,7 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
                 <Home size={20} />
               </Button>
               
-              {/* Audio Transport Controls (Play/Pause, Timeline, Skip) */}
+              {/* Audio Transport Controls */}
               <AudioTransportControls
                 isPlaying={isPlaying}
                 currentTime={currentTime}
@@ -244,7 +258,19 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
                 speedToSliderValue={speedToSliderValue}
               />
               
-              {/* Balance Control (Headphones) */}
+              {/* Transpose Control */}
+              <TransposeControl
+                transpose={transpose}
+                tempTranspose={tempTranspose}
+                isTransposeVisible={isTransposeVisible}
+                showTranspose={showTranspose}
+                scheduleHideTranspose={scheduleHideTranspose}
+                handleTempTransposeChange={handleTempTransposeChange}
+                applyTranspose={applyTranspose}
+                resetTranspose={resetTranspose}
+              />
+              
+              {/* Balance Control */}
               <BalanceControl
                 balance={balance}
                 isBalanceVisible={isBalanceVisible}
@@ -262,7 +288,7 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
                 handleVolumeChange={handleVolumeChange}
               />
               
-              {/* Utility Controls (Loop, Piano) */}
+              {/* Utility Controls */}
               <AudioUtilityControls
                 isLooping={isLooping}
                 showPiano={showPiano}

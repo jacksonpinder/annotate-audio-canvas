@@ -1,7 +1,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Gauge } from 'lucide-react';
+import { Stopwatch } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface PlaybackSpeedControlProps {
@@ -43,17 +43,18 @@ export default function PlaybackSpeedControl({
         )}
       >
         <div className="relative">
-          <Gauge size={20} />
-          <span className="absolute text-[8px] font-medium top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-            {speed}x
-          </span>
+          <Stopwatch size={20} />
+          {speed !== 1 && (
+            <span className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 text-[10px] font-medium">
+              {speed}x
+            </span>
+          )}
         </div>
       </Button>
       
-      {/* Playback Speed Slider (shows on hover/tap) */}
       {isSpeedControlVisible && (
         <div 
-          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-popover rounded-md shadow-md p-2 w-32 z-50"
+          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-popover rounded-md shadow-md p-2 w-48 z-50"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="text-center mb-1 text-xs font-medium">{tempSpeed}x</div>
@@ -63,7 +64,7 @@ export default function PlaybackSpeedControl({
               value={[speedToSliderValue(tempSpeed)]}
               min={0}
               max={100}
-              step={25}
+              step={5}
               onValueChange={handleTempSpeedChange}
               onValueCommit={applySpeed}
               aria-label="Playback speed"
