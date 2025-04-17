@@ -15,7 +15,7 @@ export function useAudioBalance(audioElement: React.RefObject<HTMLAudioElement>,
   // Apply balance effect to audio element
   useEffect(() => {
     const audio = audioElement.current;
-    if (!audio || !audio.audioTracks) return;
+    if (!audio) return;
     
     try {
       // Create audio context if needed
