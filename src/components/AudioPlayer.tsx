@@ -2,15 +2,46 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { VerticalSlider } from '@/components/ui/vertical-slider';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { 
-  Play, Pause, Rewind, FastForward, Repeat, Volume2, VolumeX, Piano, Home
+  Play, Pause, Rewind, FastForward, Repeat, Volume2, VolumeX, Piano, Home,
+  Headphones
 } from 'lucide-react';
 import PianoKeyboard from './PianoKeyboard';
+import { useAudioBalance } from '@/hooks/useAudioBalance';
+import { cn } from '@/lib/utils';
 
 interface AudioPlayerProps {
   audioFile: File | null;
   onHomeClick?: () => void;
 }
+
+// Custom Headphone Balance Icon Components
+const HeadphonesBalanced = () => (
+  <div className="relative">
+    <Headphones size={20} />
+    <span className="absolute text-[8px] font-semibold bottom-1.5 left-1">L</span>
+    <span className="absolute text-[8px] font-semibold bottom-1.5 right-1">R</span>
+  </div>
+);
+
+const HeadphonesLeftBiased = () => (
+  <div className="relative">
+    <Headphones size={20} />
+    <span className="absolute text-[8px] font-bold bottom-1.5 left-1">L</span>
+    <span className="absolute text-[8px] font-light opacity-60 bottom-1.5 right-1">R</span>
+  </div>
+);
+
+const HeadphonesRightBiased = () => (
+  <div className="relative">
+    <Headphones size={20} />
+    <span className="absolute text-[8px] font-light opacity-60 bottom-1.5 left-1">L</span>
+    <span className="absolute text-[8px] font-bold bottom-1.5 right-1">R</span>
+  </div>
+);
 
 export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -21,9 +52,21 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
   const [isMuted, setIsMuted] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
   const [showPiano, setShowPiano] = useState(false);
+  const [isVolumeSliderOpen, setIsVolumeSliderOpen] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | null>(null);
+  
+  // Initialize the balance control hook
+  const {
+    balance,
+    isBalanceVisible,
+    showBalance,
+    scheduleHideBalance,
+    hideBalanceImmediate,
+    handleBalanceChange,
+    resetBalance
+  } = useAudioBalance(audioRef, { snapThreshold: 0.08 });
 
   // Convert the File to a URL for audio element
   useEffect(() => {
@@ -107,6 +150,15 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
       setCurrentTime(newTime);
     }
   };
+  
+  // Handle volume change
+  const handleVolumeChange = (newValue: number[]) => {
+    if (!audioRef.current) return;
+    
+    const newVolume = newValue[0];
+    audioRef.current.volume = isMuted ? 0 : newVolume;
+    setVolume(newVolume);
+  };
 
   // Toggle mute
   const toggleMute = () => {
@@ -152,6 +204,17 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
     if (!audioRef.current) return;
     
     setDuration(audioRef.current.duration);
+  };
+  
+  // Determine which headphones icon to use based on balance
+  const getHeadphonesIcon = () => {
+    if (balance === 0) {
+      return <HeadphonesBalanced />;
+    } else if (balance < 0) {
+      return <HeadphonesLeftBiased />;
+    } else {
+      return <HeadphonesRightBiased />;
+    }
   };
 
   return (
@@ -241,16 +304,76 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
                 <span className="text-[9px] mt-[-2px] text-muted-foreground">15 sec</span>
               </div>
               
-              {/* Volume/Mute Button */}
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={toggleMute}
-                aria-label={isMuted ? "Unmute" : "Mute"}
-                className="flex-shrink-0"
+              {/* Balance Control (Headphones) */}
+              <div className="relative flex-shrink-0" 
+                onMouseEnter={showBalance}
+                onMouseLeave={scheduleHideBalance}
               >
-                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-              </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={resetBalance}
+                  aria-label="Adjust audio balance"
+                  className={cn(
+                    "flex-shrink-0",
+                    balance !== 0 && "text-primary"
+                  )}
+                >
+                  {getHeadphonesIcon()}
+                </Button>
+                
+                {/* Balance Slider (shows on hover/tap) */}
+                {isBalanceVisible && (
+                  <div 
+                    className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-popover rounded-md shadow-md p-2 w-32 z-50"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="w-full flex items-center gap-2 py-2">
+                      <span className="text-xs font-medium">L</span>
+                      <Slider
+                        value={[balance]}
+                        min={-1}
+                        max={1}
+                        step={0.01}
+                        onValueChange={handleBalanceChange}
+                        aria-label="Audio balance"
+                      />
+                      <span className="text-xs font-medium">R</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Volume Control */}
+              <div className="relative flex-shrink-0">
+                <Popover open={isVolumeSliderOpen} onOpenChange={setIsVolumeSliderOpen}>
+                  <PopoverTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={toggleMute}
+                      aria-label={isMuted ? "Unmute" : "Mute"}
+                      className="flex-shrink-0"
+                    >
+                      {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    side="top" 
+                    align="center" 
+                    className="w-12 p-3 h-32 flex items-center justify-center"
+                  >
+                    <VerticalSlider
+                      value={[volume]}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      onValueChange={handleVolumeChange}
+                      aria-label="Volume"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
               
               {/* Loop Button */}
               <Button 
