@@ -3,11 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
-// Toolbar is commented out
-// import AnnotationToolbar from './AnnotationToolbar';
 import AnnotationLayer from './AnnotationLayer';
 import { useIsMobile } from '@/hooks/use-mobile';
 import LoadingSpinner from './LoadingSpinner';
+import ZoomControl from './ZoomControl';
 
 // Configure pdfjs worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -31,7 +30,6 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
       const fileUrl = URL.createObjectURL(pdfFile);
       setPdfUrl(fileUrl);
 
-      // Clean up the URL when component unmounts
       return () => {
         URL.revokeObjectURL(fileUrl);
       };
@@ -41,7 +39,6 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
     
-    // Create an array of Page components
     const pagesArray = Array.from(
       new Array(numPages),
       (_, index) => (
@@ -68,20 +65,23 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
     setPages(pagesArray);
   }
 
-  function changeScale(delta: number) {
-    setScale(Math.max(0.5, Math.min(scale + delta, 2.5)));
-  }
+  const handleZoomIn = () => {
+    setScale(prevScale => Math.min(prevScale + 0.05, 2.5));
+  };
+
+  const handleZoomOut = () => {
+    setScale(prevScale => Math.max(prevScale - 0.05, 0.5));
+  };
 
   return (
     <div className="pdf-viewer-container flex flex-col h-full">
       {pdfUrl ? (
         <>
-          {/* Annotation toolbar is fully commented out as requested */}
-          
           <div 
             ref={containerRef}
             className="pdf-document-container flex-grow overflow-auto relative border rounded-md"
           >
+            <ZoomControl onZoomIn={handleZoomIn} onZoomOut={handleZoomOut} />
             <Document
               file={pdfUrl}
               onLoadSuccess={onDocumentLoadSuccess}
