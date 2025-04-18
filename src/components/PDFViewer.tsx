@@ -1,13 +1,11 @@
-
 import { useEffect, useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
-// Toolbar is commented out
-// import AnnotationToolbar from './AnnotationToolbar';
 import AnnotationLayer from './AnnotationLayer';
 import { useIsMobile } from '@/hooks/use-mobile';
 import LoadingSpinner from './LoadingSpinner';
+import ZoomControl from './pdf/ZoomControl';
 
 // Configure pdfjs worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -24,6 +22,14 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const [pages, setPages] = useState<JSX.Element[]>([]);
+
+  const handleZoomIn = () => {
+    setScale(prev => Math.min(prev + 0.05, 2.5));
+  };
+
+  const handleZoomOut = () => {
+    setScale(prev => Math.max(prev - 0.05, 0.5));
+  };
 
   // Convert the File to a URL for react-pdf
   useEffect(() => {
@@ -68,15 +74,17 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
     setPages(pagesArray);
   }
 
-  function changeScale(delta: number) {
-    setScale(Math.max(0.5, Math.min(scale + delta, 2.5)));
-  }
-
   return (
     <div className="pdf-viewer-container flex flex-col h-full">
       {pdfUrl ? (
         <>
-          {/* Annotation toolbar is fully commented out as requested */}
+          <div className="flex justify-end border-b p-2">
+            <ZoomControl
+              scale={scale}
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+            />
+          </div>
           
           <div 
             ref={containerRef}
