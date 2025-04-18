@@ -25,10 +25,7 @@ export default function AudioUtilityControls({
         aria-label={isLooping ? "Disable loop" : "Enable loop"}
         className="flex-shrink-0"
       >
-        <div className="flex flex-col items-center">
-          <Repeat size={20} />
-          <span className="text-[10px] mt-1 text-muted-foreground">Loop</span>
-        </div>
+        <Repeat size={20} />
       </Button>
       
       {/* Piano Button */}
@@ -39,10 +36,7 @@ export default function AudioUtilityControls({
         aria-label={showPiano ? "Hide piano" : "Show piano"}
         className="flex-shrink-0"
       >
-        <div className="flex flex-col items-center">
-          <Piano size={20} />
-          <span className="text-[10px] mt-1 text-muted-foreground">Piano</span>
-        </div>
+        <Piano size={20} />
       </Button>
     </>
   );

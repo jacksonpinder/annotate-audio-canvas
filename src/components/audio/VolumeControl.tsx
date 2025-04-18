@@ -31,12 +31,7 @@ export default function VolumeControl({
             aria-label={isMuted ? "Unmute" : "Mute"}
             className="flex-shrink-0"
           >
-            <div className="flex flex-col items-center">
-              {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-              <span className="text-[10px] mt-1 text-muted-foreground">
-                {isMuted ? 'Unmute' : 'Volume'}
-              </span>
-            </div>
+            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
           </Button>
         </PopoverTrigger>
         <PopoverContent 
