@@ -4,6 +4,8 @@ import FileUpload from '@/components/FileUpload';
 import PDFViewer from '@/components/PDFViewer';
 import AudioPlayer from '@/components/AudioPlayer';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { Button } from '@/components/ui/button';
+import { Home } from 'lucide-react';
 
 export default function Index() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -76,7 +78,15 @@ export default function Index() {
       ) : (
         <main className="flex-grow container mx-auto p-4 flex flex-col">
           <div className="grid grid-rows-[1fr,auto] h-full gap-4">
-            <div className="pdf-container flex-grow overflow-hidden">
+            <div className="pdf-container flex-grow overflow-hidden relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleReset}
+                className="absolute top-4 left-4 z-10 bg-black/20 hover:bg-black/30 backdrop-blur-sm md:h-8 md:w-8 h-10 w-10"
+              >
+                <Home className="md:h-4 md:w-4 h-5 w-5 text-white" />
+              </Button>
               <PDFViewer pdfFile={pdfFile} />
             </div>
             

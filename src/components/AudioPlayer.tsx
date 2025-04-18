@@ -213,6 +213,7 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
       <div className="audio-player bg-muted p-3 rounded-md shadow-md">
         {audioUrl ? (
           <>
+            
             <audio
               ref={audioRef}
               src={audioUrl}
@@ -223,16 +224,7 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
             />
             
             <div className="flex items-center space-x-2 md:space-x-3">
-              {/* Home Button */}
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={onHomeClick}
-                aria-label="Return to home screen"
-                className="flex-shrink-0"
-              >
-                <Home size={20} />
-              </Button>
+              
               
               {/* Audio Transport Controls */}
               <AudioTransportControls
