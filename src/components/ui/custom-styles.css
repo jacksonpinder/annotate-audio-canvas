@@ -112,12 +112,13 @@
 
 /* Audio player styles */
 .audio-player {
-  background-color: rgba(249, 250, 251, 0.95);
+  background-color: rgba(26, 31, 44, 0.95); /* Darker background */
   backdrop-filter: blur(8px);
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
   max-width: 1600px;
   margin: 0 auto;
   width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .audio-player-container {
@@ -165,6 +166,10 @@
 }
 
 /* PDF Viewer */
+.pdf-viewer-container {
+  background-color: #F0F2F5; /* Light gray background */
+}
+
 .pdf-viewer-container .react-pdf__Document {
   display: flex;
   flex-direction: column;
@@ -358,4 +363,18 @@
 .play-pause-button svg[data-lucide="play"] {
   position: relative;
   left: 2px; /* Slight offset to center the triangle shape visually */
+}
+
+/* Enhance slider contrast */
+.audio-player .slider-root {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.audio-player [role="slider"] {
+  background-color: #1EAEDB; /* Bright blue for better visibility */
+}
+
+/* Button hover states in audio player */
+.audio-player button:hover {
+  background-color: rgba(0, 0, 0, 0.4); /* Darker hover state */
 }

@@ -24,6 +24,7 @@ export default function VolumeControl({
   const [mutedBySlider, setMutedBySlider] = useState<boolean>(false);
   const lastVolumeRef = useRef<number>(volume > 0 ? volume : 0.75);
   const [isHoveringSlider, setIsHoveringSlider] = useState<boolean>(false);
+  const hideTimeoutRef = useRef<number | null>(null);
 
   // Update the displayed volume based on mute state
   useEffect(() => {

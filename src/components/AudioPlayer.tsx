@@ -222,7 +222,7 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
 
   return (
     <div className={`audio-player-container ${showPiano ? 'piano-open' : ''}`}>
-      <div className="audio-player bg-muted p-3 rounded-md shadow-md">
+      <div className="audio-player p-3 rounded-md shadow-md">
         {audioUrl ? (
           <>
             
@@ -259,9 +259,6 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
               {/* Balance Control */}
               <BalanceControl
                 balance={balance}
-                isBalanceVisible={isBalanceVisible}
-                showBalance={showBalance}
-                scheduleHideBalance={scheduleHideBalance}
                 handleBalanceChange={handleBalanceChange}
                 resetBalance={resetBalance}
               />
