@@ -1,3 +1,4 @@
+
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Play, Pause, RotateCcw, RotateCw } from 'lucide-react';
@@ -47,10 +48,13 @@ export default function AudioTransportControls({
         aria-label="Rewind 15 seconds"
         className="audio-control-button flex-shrink-0"
       >
-        <div className="audio-control-icon">
-          <RotateCcw size={18} />
+        <div className="audio-control-icon relative">
+          <RotateCcw size={24} />
+          <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold" style={{ marginTop: '1px' }}>
+            15
+          </span>
         </div>
-        <span className="audio-control-label font-light opacity-50">15 sec</span>
+        <span className="audio-control-label font-light opacity-50">back</span>
       </Button>
       
       {/* Progress Bar Container */}
@@ -87,10 +91,13 @@ export default function AudioTransportControls({
         aria-label="Fast forward 15 seconds"
         className="audio-control-button flex-shrink-0"
       >
-        <div className="audio-control-icon">
-          <RotateCw size={18} />
+        <div className="audio-control-icon relative">
+          <RotateCw size={24} />
+          <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold" style={{ marginTop: '1px' }}>
+            15
+          </span>
         </div>
-        <span className="audio-control-label font-light opacity-50">15 sec</span>
+        <span className="audio-control-label font-light opacity-50">ahead</span>
       </Button>
     </>
   );
