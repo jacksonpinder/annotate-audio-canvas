@@ -28,6 +28,7 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
   const [isMuted, setIsMuted] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
   const [showPiano, setShowPiano] = useState(false);
+  const [wasShowingPiano, setWasShowingPiano] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -185,7 +186,18 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
 
   // Toggle piano visibility
   const togglePiano = () => {
-    setShowPiano(!showPiano);
+    if (showPiano) {
+      // If we're hiding the piano, mark it as previously visible first
+      setWasShowingPiano(true);
+      // After a brief delay, update the showPiano state
+      setTimeout(() => {
+        setShowPiano(false);
+      }, 0);
+    } else {
+      // If we're showing the piano, update both states
+      setWasShowingPiano(false);
+      setShowPiano(true);
+    }
   };
 
   // Handle end of audio playback
@@ -225,8 +237,7 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
             
             <div className="flex items-center space-x-2 md:space-x-3">
               
-              
-              {/* Audio Transport Controls */}
+              {/* Audio Transport Controls (contains Play/pause, 15 sec back, Seek, 15 sec ahead) */}
               <AudioTransportControls
                 isPlaying={isPlaying}
                 currentTime={currentTime}
@@ -235,6 +246,36 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
                 skip={skip}
                 handleTimeChange={handleTimeChange}
                 formatTime={formatTime}
+              />
+              
+              {/* Volume Control */}
+              <VolumeControl
+                volume={volume}
+                isMuted={isMuted}
+                toggleMute={toggleMute}
+                handleVolumeChange={handleVolumeChange}
+              />
+              
+              {/* Balance Control */}
+              <BalanceControl
+                balance={balance}
+                isBalanceVisible={isBalanceVisible}
+                showBalance={showBalance}
+                scheduleHideBalance={scheduleHideBalance}
+                handleBalanceChange={handleBalanceChange}
+                resetBalance={resetBalance}
+              />
+              
+              {/* Transpose Control (Pitch) */}
+              <TransposeControl
+                transpose={transpose}
+                tempTranspose={tempTranspose}
+                isTransposeVisible={isTransposeVisible}
+                showTranspose={showTranspose}
+                scheduleHideTranspose={scheduleHideTranspose}
+                handleTempTransposeChange={handleTempTransposeChange}
+                applyTranspose={applyTranspose}
+                resetTranspose={resetTranspose}
               />
               
               {/* Playback Speed Control */}
@@ -250,37 +291,7 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
                 speedToSliderValue={speedToSliderValue}
               />
               
-              {/* Transpose Control */}
-              <TransposeControl
-                transpose={transpose}
-                tempTranspose={tempTranspose}
-                isTransposeVisible={isTransposeVisible}
-                showTranspose={showTranspose}
-                scheduleHideTranspose={scheduleHideTranspose}
-                handleTempTransposeChange={handleTempTransposeChange}
-                applyTranspose={applyTranspose}
-                resetTranspose={resetTranspose}
-              />
-              
-              {/* Balance Control */}
-              <BalanceControl
-                balance={balance}
-                isBalanceVisible={isBalanceVisible}
-                showBalance={showBalance}
-                scheduleHideBalance={scheduleHideBalance}
-                handleBalanceChange={handleBalanceChange}
-                resetBalance={resetBalance}
-              />
-              
-              {/* Volume Control */}
-              <VolumeControl
-                volume={volume}
-                isMuted={isMuted}
-                toggleMute={toggleMute}
-                handleVolumeChange={handleVolumeChange}
-              />
-              
-              {/* Utility Controls */}
+              {/* Utility Controls (Loop and Piano) */}
               <AudioUtilityControls
                 isLooping={isLooping}
                 showPiano={showPiano}
@@ -298,9 +309,13 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
 
       {/* Piano Keyboard */}
       <div 
-        className={`piano-container transition-transform duration-300 ease-in-out ${
-          showPiano ? 'translate-y-0' : 'translate-y-full'
-        }`}
+        className={`piano-container ${showPiano ? 'active' : ''} ${wasShowingPiano ? 'was-active' : ''}`}
+        onTransitionEnd={() => {
+          // Clear the was-active class after the animation finishes
+          if (!showPiano) {
+            setWasShowingPiano(false);
+          }
+        }}
       >
         <PianoKeyboard />
       </div>

@@ -1,6 +1,5 @@
-
 import { Button } from '@/components/ui/button';
-import { Piano, Repeat } from 'lucide-react';
+import { Piano, Repeat2 } from 'lucide-react';
 
 interface AudioUtilityControlsProps {
   isLooping: boolean;
@@ -23,9 +22,17 @@ export default function AudioUtilityControls({
         size="icon" 
         onClick={toggleLoop}
         aria-label={isLooping ? "Disable loop" : "Enable loop"}
-        className="flex-shrink-0"
+        className="audio-control-button flex-shrink-0"
+        data-state={isLooping ? "active" : "inactive"}
       >
-        <Repeat size={20} />
+        <div className="audio-control-icon">
+          <Repeat2 size={20} />
+        </div>
+        {isLooping && (
+          <span className="audio-control-label">
+            Loop
+          </span>
+        )}
       </Button>
       
       {/* Piano Button */}
@@ -34,9 +41,17 @@ export default function AudioUtilityControls({
         size="icon" 
         onClick={togglePiano}
         aria-label={showPiano ? "Hide piano" : "Show piano"}
-        className="flex-shrink-0"
+        className="audio-control-button flex-shrink-0"
+        data-state={showPiano ? "active" : "inactive"}
       >
-        <Piano size={20} />
+        <div className="audio-control-icon">
+          <Piano size={20} />
+        </div>
+        {showPiano && (
+          <span className="audio-control-label">
+            Piano
+          </span>
+        )}
       </Button>
     </>
   );

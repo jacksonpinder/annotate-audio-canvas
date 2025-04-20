@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -36,41 +35,46 @@ export default function PDFViewer({ pdfFile }: PDFViewerProps) {
     }
   }, [pdfFile]);
 
+  // Regenerate pages when scale changes
+  useEffect(() => {
+    if (numPages) {
+      const pagesArray = Array.from(
+        new Array(numPages),
+        (_, index) => (
+          <div key={`page_${index + 1}`} className="relative mb-4 pointer-events-none">
+            <Page 
+              key={`page_${index + 1}`}
+              pageNumber={index + 1} 
+              scale={scale}
+              width={isMobile ? window.innerWidth - 32 : undefined}
+              renderTextLayer={false}
+              renderAnnotationLayer={false}
+              className="pointer-events-none"
+            />
+            <AnnotationLayer 
+              containerRef={containerRef}
+              activeTool={activeAnnotationTool} 
+              scale={scale}
+              pageNumber={index + 1}
+            />
+          </div>
+        )
+      );
+      
+      setPages(pagesArray);
+    }
+  }, [scale, numPages, isMobile, activeAnnotationTool]);
+
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
-    
-    const pagesArray = Array.from(
-      new Array(numPages),
-      (_, index) => (
-        <div key={`page_${index + 1}`} className="relative mb-4 pointer-events-none">
-          <Page 
-            key={`page_${index + 1}`}
-            pageNumber={index + 1} 
-            scale={scale}
-            width={isMobile ? window.innerWidth - 32 : undefined}
-            renderTextLayer={false}
-            renderAnnotationLayer={false}
-            className="pointer-events-none"
-          />
-          <AnnotationLayer 
-            containerRef={containerRef}
-            activeTool={activeAnnotationTool} 
-            scale={scale}
-            pageNumber={index + 1}
-          />
-        </div>
-      )
-    );
-    
-    setPages(pagesArray);
   }
 
   const handleZoomIn = () => {
-    setScale(prevScale => Math.min(prevScale + 0.05, 2.5));
+    setScale(prevScale => Math.min(prevScale + 0.1, 2.5));
   };
 
   const handleZoomOut = () => {
-    setScale(prevScale => Math.max(prevScale - 0.05, 0.5));
+    setScale(prevScale => Math.max(prevScale - 0.1, 0.5));
   };
 
   return (

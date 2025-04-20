@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import FileUpload from '@/components/FileUpload';
-import PDFViewer from '@/components/PDFViewer';
+import SimplePDFViewer from '@/components/SimplePDFViewer';
 import AudioPlayer from '@/components/AudioPlayer';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { Button } from '@/components/ui/button';
@@ -76,18 +75,18 @@ export default function Index() {
           </div>
         </main>
       ) : (
-        <main className="flex-grow container mx-auto p-4 flex flex-col">
-          <div className="grid grid-rows-[1fr,auto] h-full gap-4">
+        <main className="flex-grow container mx-auto p-0 flex flex-col">
+          <div className="grid grid-rows-[1fr,auto] h-full">
             <div className="pdf-container flex-grow overflow-hidden relative">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={handleReset}
-                className="absolute top-4 left-4 z-10 bg-black/20 hover:bg-black/30 backdrop-blur-sm md:h-8 md:w-8 h-10 w-10"
+                className="fixed top-4 left-4 z-50 bg-black/20 hover:bg-black/30 backdrop-blur-sm md:h-8 md:w-8 h-10 w-10"
               >
                 <Home className="md:h-4 md:w-4 h-5 w-5 text-white" />
               </Button>
-              <PDFViewer pdfFile={pdfFile} />
+              <SimplePDFViewer pdfFile={pdfFile} />
             </div>
             
             <div className="audio-container sticky bottom-0 left-0 right-0 z-10">
@@ -96,10 +95,6 @@ export default function Index() {
           </div>
         </main>
       )}
-      
-      <footer className="bg-muted py-3 text-center text-sm text-muted-foreground">
-        <p>Audio PDF Annotator &copy; {new Date().getFullYear()}</p>
-      </footer>
     </div>
   );
 }

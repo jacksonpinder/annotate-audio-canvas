@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 
 type PlaybackSpeedOptions = {
@@ -13,7 +12,7 @@ export function usePlaybackSpeed(audioElement: React.RefObject<HTMLAudioElement>
     initialSpeed = 1, 
     minSpeed = 0.5, 
     maxSpeed = 1.5, 
-    step = 0.25 
+    step = 0.05 
   } = options;
   
   const [speed, setSpeed] = useState<number>(initialSpeed);
@@ -41,8 +40,9 @@ export function usePlaybackSpeed(audioElement: React.RefObject<HTMLAudioElement>
   // Convert slider value to speed
   const sliderValueToSpeed = (sliderValue: number): number => {
     const rawSpeed = minSpeed + (sliderValue / 100) * (maxSpeed - minSpeed);
-    // Snap to nearest step value
-    return Math.round(rawSpeed / step) * step;
+    // Snap to nearest step value and fix precision issues
+    const steps = Math.round(rawSpeed / step);
+    return parseFloat((steps * step).toFixed(2));
   };
   
   // Handle dragging the slider (updates temporary speed)

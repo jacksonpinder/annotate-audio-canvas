@@ -1,7 +1,6 @@
-
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Play, Pause, Rewind, FastForward } from 'lucide-react';
+import { Play, Pause, RotateCcw, RotateCw } from 'lucide-react';
 
 interface AudioTransportControlsProps {
   isPlaying: boolean;
@@ -30,60 +29,69 @@ export default function AudioTransportControls({
         size="icon" 
         onClick={togglePlayPause}
         aria-label={isPlaying ? "Pause" : "Play"}
-        className="flex-shrink-0"
+        className="audio-control-button flex-shrink-0 play-pause-button"
       >
-        {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+        <div className="audio-control-icon flex items-center justify-center w-full">
+          {isPlaying ? 
+            <Pause size={32} className="transform scale-125" /> : 
+            <Play size={32} className="transform scale-125" />
+          }
+        </div>
       </Button>
       
       {/* Rewind 15 seconds */}
-      <div className="flex flex-col items-center flex-shrink-0">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => skip(-15)}
-          aria-label="Rewind 15 seconds"
-          className="flex-shrink-0 h-8"
-        >
-          <Rewind size={18} />
-        </Button>
-        <span className="text-[9px] mt-[-2px] text-muted-foreground">15 sec</span>
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        onClick={() => skip(-15)}
+        aria-label="Rewind 15 seconds"
+        className="audio-control-button flex-shrink-0"
+      >
+        <div className="audio-control-icon">
+          <RotateCcw size={18} />
+        </div>
+        <span className="audio-control-label font-light opacity-50">15 sec</span>
+      </Button>
+      
+      {/* Progress Bar Container */}
+      <div className="flex-grow mx-1 relative audio-control-button">
+        {/* Slider Container */}
+        <div className="w-full flex items-center audio-control-icon justify-center">
+          <Slider
+            value={[currentTime]}
+            min={0}
+            max={duration || 100}
+            step={0.01}
+            onValueChange={handleTimeChange}
+            aria-label="Seek position"
+            className="w-full"
+          />
+        </div>
+        
+        {/* Bottom label container, same level as other button labels */}
+        <div className="absolute bottom-4 left-0 right-0 w-full">
+          <span className="absolute left-0 text-xs" style={{ fontSize: '12px', lineHeight: 1 }}>
+            {formatTime(currentTime)}
+          </span>
+          <span className="absolute right-0 text-xs" style={{ fontSize: '12px', lineHeight: 1 }}>
+            {formatTime(duration - currentTime)}
+          </span>
+        </div>
       </div>
-      
-      {/* Current Time */}
-      <span className="text-xs text-muted-foreground flex-shrink-0">
-        {formatTime(currentTime)}
-      </span>
-      
-      {/* Progress Bar */}
-      <div className="flex-grow mx-1">
-        <Slider
-          value={[currentTime]}
-          min={0}
-          max={duration || 100}
-          step={0.01}
-          onValueChange={handleTimeChange}
-          aria-label="Seek position"
-        />
-      </div>
-      
-      {/* Duration/Time Left */}
-      <span className="text-xs text-muted-foreground flex-shrink-0">
-        {formatTime(duration - currentTime)}
-      </span>
       
       {/* Fast Forward 15 seconds */}
-      <div className="flex flex-col items-center flex-shrink-0">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => skip(15)}
-          aria-label="Fast forward 15 seconds"
-          className="flex-shrink-0 h-8"
-        >
-          <FastForward size={18} />
-        </Button>
-        <span className="text-[9px] mt-[-2px] text-muted-foreground">15 sec</span>
-      </div>
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        onClick={() => skip(15)}
+        aria-label="Fast forward 15 seconds"
+        className="audio-control-button flex-shrink-0"
+      >
+        <div className="audio-control-icon">
+          <RotateCw size={18} />
+        </div>
+        <span className="audio-control-label font-light opacity-50">15 sec</span>
+      </Button>
     </>
   );
 }
