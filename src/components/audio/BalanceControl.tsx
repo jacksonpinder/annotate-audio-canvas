@@ -1,9 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { cn } from '@/lib/utils';
-import { useRef, useState, useEffect } from 'react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Headphones } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useHoverControl } from '@/hooks/useHoverControl';
 
 // Custom Headphone Balance Icon Components for display
 const HeadphonesBalanced = () => (
@@ -28,81 +27,29 @@ const HeadphonesRightBiased = () => (
 
 interface BalanceControlProps {
   balance: number;
-  isBalanceVisible: boolean;
-  showBalance: () => void;
-  scheduleHideBalance: () => void;
   handleBalanceChange: (newValue: number[]) => void;
   resetBalance: () => void;
 }
 
 export default function BalanceControl({
   balance,
-  isBalanceVisible,
-  showBalance,
-  scheduleHideBalance,
   handleBalanceChange,
   resetBalance
 }: BalanceControlProps) {
-  // Determine which headphones icon to use based on balance
-  const getHeadphonesIcon = () => {
-    if (balance === 0) {
-      return <HeadphonesBalanced />;
-    } else if (balance < 0) {
-      return <HeadphonesLeftBiased />;
-    } else {
-      return <HeadphonesRightBiased />;
-    }
-  };
-  
+  const { isVisible, show, scheduleHide } = useHoverControl(250);
   const isBalanced = balance === 0;
-  
-  // Store the last non-center balance setting
-  const lastCustomBalanceRef = useRef<number>(isBalanced ? 0.5 : balance);
-  const [isSliderOpen, setIsSliderOpen] = useState<boolean>(false);
-  const hideTimeoutRef = useRef<number | null>(null);
-  
-  // Custom balance toggle function
-  const handleBalanceToggle = () => {
-    if (!isBalanced) {
-      // If not balanced, store current value and reset to center
-      lastCustomBalanceRef.current = balance;
-      resetBalance();
-    } else {
-      // If centered, restore to last non-center value
-      handleBalanceChange([lastCustomBalanceRef.current]);
-    }
-  };
-  
-  // Sync external visibility state with local state
-  useEffect(() => {
-    setIsSliderOpen(isBalanceVisible);
-  }, [isBalanceVisible]);
-  
-  // Function to show the slider
-  const handleShowSlider = () => {
-    if (hideTimeoutRef.current) {
-      window.clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
-    showBalance();
-  };
-  
-  // Function to hide the slider
-  const handleHideSlider = () => {
-    scheduleHideBalance();
-  };
 
   return (
-    <div className="relative flex-shrink-0 balance-control" 
-      onMouseEnter={handleShowSlider}
-      onMouseLeave={handleHideSlider}
+    <div className="relative flex-shrink-0 balance-control"
+      onMouseEnter={show}
+      onMouseLeave={scheduleHide}
     >
-      <Popover open={isSliderOpen} onOpenChange={setIsSliderOpen}>
+      <Popover open={isVisible}>
         <PopoverTrigger asChild>
           <Button 
             variant={!isBalanced ? "default" : "ghost"}
             size="icon" 
-            onClick={handleBalanceToggle}
+            onClick={resetBalance}
             aria-label="Adjust audio balance"
             className="audio-control-button flex-shrink-0"
             data-state={!isBalanced ? "active" : "inactive"}
@@ -112,23 +59,20 @@ export default function BalanceControl({
             </div>
             {!isBalanced && (
               <span className="audio-control-label">
-                {getHeadphonesIcon()}
+                {balance < 0 ? 'L' : 'R'}
               </span>
             )}
           </Button>
         </PopoverTrigger>
-        
-        {/* Balance Slider (shows on hover/tap) */}
         <PopoverContent 
           side="top" 
           align="center" 
           className="balance-slider w-48 p-3 flex flex-col items-center justify-center gap-1 z-50"
-          onClick={(e) => e.stopPropagation()}
-          onMouseEnter={handleShowSlider}
-          onMouseLeave={handleHideSlider}
+          onMouseEnter={show}
+          onMouseLeave={scheduleHide}
         >
           <div className="text-center mb-1 text-xs font-medium">
-            Fade left or right
+            Balance
           </div>
           <div className="w-full flex items-center gap-2 py-1">
             <span className="text-xs font-medium">L</span>

@@ -1,9 +1,10 @@
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Gauge } from 'lucide-react';  // Changed from Clock to Gauge
-import { cn } from '@/lib/utils';
+import { Gauge } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useHoverControl } from '@/hooks/useHoverControl';
+import { cn } from '@/lib/utils';
 
 interface PlaybackSpeedControlProps {
   speed: number;
@@ -33,9 +34,9 @@ export default function PlaybackSpeedControl({
   resetSpeed,
   speedToSliderValue
 }: PlaybackSpeedControlProps) {
+  const { isVisible, show, scheduleHide } = useHoverControl(250);
+  const lastCustomSpeedRef = useRef<number>(speed !== 1 ? speed : 1.25);
   const isNonDefaultSpeed = speed !== 1;
-  // Store the last non-default speed value
-  const lastCustomSpeedRef = useRef<number>(isNonDefaultSpeed ? speed : 1.25);
   const [isSliderOpen, setIsSliderOpen] = useState<boolean>(false);
   const hideTimeoutRef = useRef<number | null>(null);
 
@@ -70,13 +71,13 @@ export default function PlaybackSpeedControl({
   const handleHideSlider = () => {
     scheduleHideSpeedControl();
   };
-  
+
   return (
     <div className="relative flex-shrink-0 speed-control"
-      onMouseEnter={handleShowSlider}
-      onMouseLeave={handleHideSlider}
+      onMouseEnter={show}
+      onMouseLeave={scheduleHide}
     >
-      <Popover open={isSliderOpen} onOpenChange={setIsSliderOpen}>
+      <Popover open={isVisible} onOpenChange={setIsSliderOpen}>
         <PopoverTrigger asChild>
           <Button 
             variant={isNonDefaultSpeed ? "default" : "ghost"}
@@ -101,8 +102,8 @@ export default function PlaybackSpeedControl({
           align="center" 
           className="speed-slider w-48 p-3 flex flex-col items-center justify-center gap-1 z-50"
           onClick={(e) => e.stopPropagation()}
-          onMouseEnter={handleShowSlider}
-          onMouseLeave={handleHideSlider}
+          onMouseEnter={show}
+          onMouseLeave={scheduleHide}
         >
           <div className="text-center mb-1 text-xs font-medium">{formatSpeed(tempSpeed, true)}</div>
           <div className="w-full flex items-center gap-2 py-1">
