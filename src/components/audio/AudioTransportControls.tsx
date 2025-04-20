@@ -33,8 +33,8 @@ export default function AudioTransportControls({
       >
         <div className="audio-control-icon flex items-center justify-center w-full">
           {isPlaying ? 
-            <Pause size={32} className="transform scale-125" /> : 
-            <Play size={32} className="transform scale-125" />
+            <Pause className="transform scale-[2.2]" strokeWidth={1.2} /> : 
+            <Play className="transform scale-[2.2]" strokeWidth={1.2} />
           }
         </div>
       </Button>
@@ -45,23 +45,24 @@ export default function AudioTransportControls({
         size="icon" 
         onClick={() => skip(-15)}
         aria-label="Rewind 15 seconds"
-        className="audio-control-button flex-shrink-0"
+        className="audio-control-button flex-shrink-0 rewind-button"
       >
         <div className="audio-control-icon relative">
-          <RotateCcw size={32} />
+          <RotateCcw strokeWidth={1.2} />
           <span 
-            className="absolute text-[8px] font-bold text-current" 
+            className="absolute text-[11px] font-semibold text-current" 
             style={{ 
               top: '50%', 
               left: '50%', 
               transform: 'translate(-50%, -50%)',
-              marginTop: '-2px'  // Fine-tune vertical positioning
+              marginTop: '-1px',
+              marginLeft: '1px'
             }}
           >
             15
           </span>
         </div>
-        <span className="audio-control-label font-light opacity-50">back</span>
+        <span className="audio-control-label font-light opacity-50"></span>
       </Button>
       
       {/* Progress Bar Container */}
@@ -96,23 +97,24 @@ export default function AudioTransportControls({
         size="icon" 
         onClick={() => skip(15)}
         aria-label="Fast forward 15 seconds"
-        className="audio-control-button flex-shrink-0"
+        className="audio-control-button flex-shrink-0 forward-button"
       >
         <div className="audio-control-icon relative">
-          <RotateCw size={32} />
+          <RotateCw strokeWidth={1.2} />
           <span 
-            className="absolute text-[8px] font-bold text-current" 
+            className="absolute text-[11px] font-semibold text-current" 
             style={{ 
               top: '50%', 
               left: '50%', 
               transform: 'translate(-50%, -50%)',
-              marginTop: '-2px'  // Fine-tune vertical positioning
+              marginTop: '-1px',
+              marginLeft: '-1px'
             }}
           >
             15
           </span>
         </div>
-        <span className="audio-control-label font-light opacity-50">ahead</span>
+        <span className="audio-control-label font-light opacity-50"></span>
       </Button>
     </>
   );

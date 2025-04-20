@@ -279,11 +279,34 @@
   transform: scale(1.05);
 }
 
-/* Audio control consistency */
+/* Audio button hover states - improved contrast - REPLACED WITH NEW VARIABLES VERSION */
+/* 
+.audio-player .audio-control-button:not(.flex-grow):hover:not([data-state="active"]) {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+  transition: background-color 0.2s ease;
+}
+
+.audio-player button[class*="ghost"].audio-control-button:not(.flex-grow):hover:not([data-state="active"]) {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.audio-player .audio-control-button:not(.flex-grow):not([data-state="active"]):hover::before {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+.dark .audio-player .audio-control-button:not(.flex-grow):hover:not([data-state="active"]),
+.dark .audio-player button[class*="ghost"].audio-control-button:not(.flex-grow):hover:not([data-state="active"]),
+.dark .audio-player .audio-control-button:not(.flex-grow):not([data-state="active"]):hover::before {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+*/
+
+/* Audio control consistency - REPLACED WITH NEW VARIABLES VERSION */
+/*
 .audio-control-button {
   position: relative;
-  height: 50px !important; /* Fixed height for all buttons */
-  padding-bottom: 20px !important; /* Space for label */
+  height: 50px !important;
+  padding-bottom: 20px !important;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -291,8 +314,32 @@
 }
 
 .audio-control-icon {
-  margin-top: 6px; /* Center the icon in the top portion */
-  height: 24px; /* Fixed height for all icons */
+  margin-top: 6px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.audio-control-icon svg[data-lucide="rotate-ccw"],
+.audio-control-icon svg[data-lucide="rotate-cw"] {
+  height: auto !important;
+  width: auto !important;
+  margin-top: 0px;
+  min-height: 24px;
+  position: relative;
+  top: 3px;
+}
+
+button:has(.audio-control-icon svg[data-lucide="rotate-ccw"]),
+button:has(.audio-control-icon svg[data-lucide="rotate-cw"]) {
+  min-width: 76px;
+  padding: 0 10px;
+}
+
+button:has(.audio-control-icon svg[data-lucide="rotate-ccw"]) .audio-control-icon,
+button:has(.audio-control-icon svg[data-lucide="rotate-cw"]) .audio-control-icon {
+  height: 36px !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -311,12 +358,10 @@
   text-align: center;
 }
 
-/* Seekbar specific styles */
 .audio-control-button .audio-control-icon.w-full {
   width: 100%;
 }
 
-/* Time label positioning */
 .audio-control-label-left {
   position: absolute;
   bottom: 4px;
@@ -344,18 +389,259 @@
   text-align: right;
 }
 
-/* Play/Pause button specific styles */
 .play-pause-button {
-  width: 44px !important; /* Fixed width for play/pause button */
+  width: 56px !important;
 }
 
 .play-pause-button .audio-control-icon {
-  height: 36px !important; /* Increased height for the icons but not too much */
-  margin-top: 2px; /* Slight adjustment to match other icons vertically */
+  height: 42px !important;
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Adjustments for the Play button icon (offset triangle) */
 .play-pause-button svg[data-lucide="play"] {
   position: relative;
-  left: 2px; /* Slight offset to center the triangle shape visually */
+  left: 2px;
+  height: auto !important;
+  width: auto !important;
+  margin-top: 0px;
+  top: 3px;
+}
+
+.play-pause-button svg[data-lucide="pause"] {
+  height: auto !important;
+  width: auto !important;
+  margin-top: 0px;
+  top: 3px;
+  position: relative;
+}
+*/
+
+/* More CSS, keep unrelated styles */
+
+/* 
+ * Audio Controls - Unified button styling with CSS variables
+ * This approach makes it easy to adjust positioning across all buttons
+ */
+:root {
+  --button-height: 50px;
+  --button-padding-bottom: 20px;
+  --icon-container-height: 30px;
+  --icon-vertical-offset: 0px;  /* General vertical position adjustment */
+  --label-bottom-position: 4px;
+  --label-font-size: 11px;
+  --button-hover-bg: rgba(0, 0, 0, 0.08);
+  --button-dark-hover-bg: rgba(255, 255, 255, 0.15);
+}
+
+/* Base button styling */
+.audio-control-button {
+  position: relative;
+  height: var(--button-height) !important;
+  padding-bottom: var(--button-padding-bottom) !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center; /* Changed to center for better vertical alignment */
+}
+
+/* Icon container - centered by default */
+.audio-control-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--icon-container-height) !important;
+  width: 100%;
+  position: relative;
+  top: var(--icon-vertical-offset);
+}
+
+/* Label styling */
+.audio-control-label {
+  position: absolute;
+  bottom: var(--label-bottom-position);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--label-font-size);
+  line-height: 1;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--muted-foreground, #71717a);
+  text-align: center;
+}
+
+/* All SVG icons within buttons */
+.audio-control-icon svg {
+  position: relative;
+  height: auto !important;
+  width: auto !important;
+}
+
+/* Transport controls (rewind/forward) */
+.audio-control-icon svg[data-lucide="rotate-ccw"],
+.audio-control-icon svg[data-lucide="rotate-cw"] {
+  /* transform: scale(3.0) !important; */
+  /* width: 32px !important; */ /* Reverting width/height */
+  /* height: 32px !important; */
+  font-size: 32px !important; /* Trying font-size approach */
+  width: 1em !important; /* Set width relative to font-size */
+  height: 1em !important; /* Set height relative to font-size */
+  min-height: auto;
+}
+
+/* Give more space to the rewind/forward buttons */
+button:has(.audio-control-icon svg[data-lucide="rotate-ccw"]),
+button:has(.audio-control-icon svg[data-lucide="rotate-cw"]) {
+  min-width: 85px !important; /* Increased from 80px for larger icons */
+  padding: 0 12px;
+}
+
+/* Ensure the icon container has enough space */
+button:has(.audio-control-icon svg[data-lucide="rotate-ccw"]) .audio-control-icon,
+button:has(.audio-control-icon svg[data-lucide="rotate-cw"]) .audio-control-icon {
+  height: 48px !important; /* Increased container height further to 48px */
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -5px; /* Keep vertical adjustment */
+}
+
+/* Play/Pause button */
+.play-pause-button {
+  width: 44px !important; /* Match rewind/forward width */
+  min-width: 44px !important;
+  padding: 0 !important; /* Match padding */
+}
+
+.play-pause-button .audio-control-icon {
+  height: 44px !important; /* Match container height */
+  width: 44px !important; /* Match container width */
+  margin-top: -2px; /* Match vertical offset */
+}
+
+.play-pause-button .audio-control-icon svg {
+  transform: none !important; /* Ensure no scale */
+  width: 38px !important;  /* Increased SVG width */
+  height: 38px !important; /* Increased SVG height */
+}
+
+/* Pitch control (flat/sharp symbols) - make them bolder and bigger */
+.transpose-control .audio-control-icon span {
+  font-size: 1.2rem !important;
+  font-weight: 600 !important;
+  line-height: 1;
+  display: inline-block;
+  transform: scale(1.1);
+}
+
+/* Utility controls (smaller icons) */
+.audio-control-icon svg:not([data-lucide="rotate-ccw"]):not([data-lucide="rotate-cw"]):not([data-lucide="play"]):not([data-lucide="pause"]) {
+  transform: scale(1.0); /* Standard size for utility icons */
+}
+
+/* Hover states with improved contrast */
+.audio-player .audio-control-button:not(.flex-grow):hover:not([data-state="active"]) {
+  background-color: var(--button-hover-bg) !important;
+  transition: background-color 0.2s ease;
+}
+
+.audio-player button[class*="ghost"].audio-control-button:not(.flex-grow):hover:not([data-state="active"]) {
+  background-color: var(--button-hover-bg) !important;
+}
+
+/* Dark mode support */
+.dark {
+  --button-hover-bg: var(--button-dark-hover-bg);
+}
+
+/* Time labels for progress bar */
+.audio-control-label-left,
+.audio-control-label-right {
+  position: absolute;
+  bottom: var(--label-bottom-position);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  font-weight: 400;
+  color: var(--muted-foreground, #71717a);
+}
+
+.audio-control-label-left {
+  left: 0;
+  text-align: left;
+}
+
+.audio-control-label-right {
+  right: 0;
+  text-align: right;
+}
+
+/* Seekbar (progress) specific styles */
+.audio-control-button.flex-grow .audio-control-icon {
+  width: 100%;
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  :root {
+    --button-height: 46px;
+    --button-padding-bottom: 16px;
+    --label-font-size: 10px;
+  }
+}
+
+/* Simplified Styling using specific classes */
+
+/* Target the icon container within the specific buttons */
+.rewind-button .audio-control-icon,
+.forward-button .audio-control-icon {
+  height: 44px !important; /* Set desired container height */
+  width: 44px !important; /* Set desired container width */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -2px; /* Adjusted vertical centering */
+}
+
+/* Target the SVG icons directly within those containers */
+.rewind-button .audio-control-icon svg,
+.forward-button .audio-control-icon svg {
+  width: 30px !important;  /* Explicit width for SVG */
+  height: 30px !important; /* Explicit height for SVG */
+}
+
+/* Adjust overall button size if needed */
+.rewind-button,
+.forward-button {
+  min-width: 44px !important; /* Match the icon container width */
+  width: 44px !important; /* Explicitly set width */
+  padding: 0 !important; /* Remove horizontal padding */
+}
+
+/* Play/Pause button specific styles - ensure these don't conflict */
+.play-pause-button {
+  width: 56px !important;
+}
+
+.play-pause-button .audio-control-icon {
+  /* Ensure Play/Pause container has its own height if needed */
+  height: 42px !important; 
+}
+
+.play-pause-button .audio-control-icon svg {
+  transform: none !important; /* Ensure no scale */
+  width: 38px !important;  /* Increased SVG width */
+  height: 38px !important; /* Increased SVG height */
+}
+
+/* Remove focus outlines/rings from audio buttons */
+.audio-player .audio-control-button:focus,
+.audio-player .audio-control-button:focus-visible,
+.audio-player button:focus,
+.audio-player button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important; /* Override potential ring styles */
 }
