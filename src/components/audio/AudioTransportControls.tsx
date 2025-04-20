@@ -1,4 +1,3 @@
-
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Play, Pause, RotateCcw, RotateCw } from 'lucide-react';
@@ -49,8 +48,16 @@ export default function AudioTransportControls({
         className="audio-control-button flex-shrink-0"
       >
         <div className="audio-control-icon relative">
-          <RotateCcw size={24} />
-          <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold" style={{ marginTop: '1px' }}>
+          <RotateCcw size={32} />
+          <span 
+            className="absolute text-[8px] font-bold text-current" 
+            style={{ 
+              top: '50%', 
+              left: '50%', 
+              transform: 'translate(-50%, -50%)',
+              marginTop: '-2px'  // Fine-tune vertical positioning
+            }}
+          >
             15
           </span>
         </div>
@@ -92,8 +99,16 @@ export default function AudioTransportControls({
         className="audio-control-button flex-shrink-0"
       >
         <div className="audio-control-icon relative">
-          <RotateCw size={24} />
-          <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold" style={{ marginTop: '1px' }}>
+          <RotateCw size={32} />
+          <span 
+            className="absolute text-[8px] font-bold text-current" 
+            style={{ 
+              top: '50%', 
+              left: '50%', 
+              transform: 'translate(-50%, -50%)',
+              marginTop: '-2px'  // Fine-tune vertical positioning
+            }}
+          >
             15
           </span>
         </div>
