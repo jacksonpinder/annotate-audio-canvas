@@ -1,9 +1,8 @@
-import { useRef, useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { VerticalSlider } from '@/components/ui/vertical-slider';
 import { Volume2, VolumeX, Volume1, Volume } from 'lucide-react';
-import { useHoverControl } from '@/hooks/useHoverControl';
 import { cn } from '@/lib/utils';
 
 interface VolumeControlProps {
@@ -19,12 +18,13 @@ export default function VolumeControl({
   toggleMute,
   handleVolumeChange
 }: VolumeControlProps) {
-  const { isVisible, show, scheduleHide } = useHoverControl(250);
+  const [isVolumeSliderOpen, setIsVolumeSliderOpen] = useState<boolean>(false);
+  const hideTimeoutRef = useRef<number | null>(null);
+  const lastVolumeRef = useRef<number>(volume > 0 ? volume : 0.75); // Initialize with current volume or default
   const [displayVolume, setDisplayVolume] = useState<number>(volume);
   const [mutedBySlider, setMutedBySlider] = useState<boolean>(false);
-  const lastVolumeRef = useRef<number>(volume > 0 ? volume : 0.75);
   const [isHoveringSlider, setIsHoveringSlider] = useState<boolean>(false);
-
+  
   // Update the displayed volume based on mute state
   useEffect(() => {
     if (isMuted) {
@@ -56,12 +56,15 @@ export default function VolumeControl({
       window.clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
     }
-    show();
+    setIsVolumeSliderOpen(true);
   };
   
   // Function to schedule hiding the volume slider after delay
   const scheduleHideVolumeSlider = () => {
-    scheduleHide();
+    hideTimeoutRef.current = window.setTimeout(() => {
+      setIsVolumeSliderOpen(false);
+      hideTimeoutRef.current = null;
+    }, 250); // Reduced from 500ms to 250ms
   };
   
   // Handle mouse enter on the slider
@@ -129,10 +132,18 @@ export default function VolumeControl({
   return (
     <div 
       className="relative flex-shrink-0 volume-control"
-      onMouseEnter={show}
-      onMouseLeave={scheduleHide}
+      onMouseEnter={() => {
+        if (!isHoveringSlider) {
+          showVolumeSlider();
+        }
+      }}
+      onMouseLeave={() => {
+        if (!isHoveringSlider) {
+          scheduleHideVolumeSlider();
+        }
+      }}
     >
-      <Popover open={isVisible}>
+      <Popover open={isVolumeSliderOpen} onOpenChange={setIsVolumeSliderOpen}>
         <PopoverTrigger asChild>
           <Button 
             variant={isMuted ? "default" : "ghost"}
@@ -158,8 +169,9 @@ export default function VolumeControl({
           side="top" 
           align="center" 
           className="volume-slider w-14 p-3 h-32 flex flex-col items-center justify-center gap-1 z-50"
-          onMouseEnter={show}
-          onMouseLeave={scheduleHide}
+          onClick={(e) => e.stopPropagation()}
+          onMouseEnter={handleSliderEnter}
+          onMouseLeave={handleSliderLeave}
         >
           <VerticalSlider
             value={[displayVolume]}

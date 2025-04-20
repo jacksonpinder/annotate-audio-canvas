@@ -1,9 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { cn } from '@/lib/utils';
 import { useRef, useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useHoverControl } from '@/hooks/useHoverControl';
-import { cn } from '@/lib/utils';
 
 interface TransposeControlProps {
   transpose: number;
@@ -26,7 +25,6 @@ export default function TransposeControl({
   applyTranspose,
   resetTranspose
 }: TransposeControlProps) {
-  const { isVisible, show, scheduleHide } = useHoverControl(250);
   const pitchLabels = ['-b5', '-4', '-3', '-b3', '-2', '-b2', '0', '+b2', '+2', '+b3', '+3', '+4', '+b5'];
   const pitchToSliderValue = (pitch: number) => ((pitch + 6) / 12) * 100;
   const sliderToPitch = (value: number) => Math.round((value / 100) * 12) - 6;
@@ -71,10 +69,10 @@ export default function TransposeControl({
 
   return (
     <div className="relative flex-shrink-0 transpose-control"
-      onMouseEnter={show}
-      onMouseLeave={scheduleHide}
+      onMouseEnter={handleShowSlider}
+      onMouseLeave={handleHideSlider}
     >
-      <Popover open={isVisible}>
+      <Popover open={isSliderOpen} onOpenChange={setIsSliderOpen}>
         <PopoverTrigger asChild>
           <Button 
             variant={isTransposed ? "default" : "ghost"}
@@ -106,8 +104,9 @@ export default function TransposeControl({
           side="top" 
           align="center" 
           className="transpose-slider w-48 p-3 flex flex-col items-center justify-center gap-1 z-50"
-          onMouseEnter={show}
-          onMouseLeave={scheduleHide}
+          onClick={(e) => e.stopPropagation()}
+          onMouseEnter={handleShowSlider}
+          onMouseLeave={handleHideSlider}
         >
           <div className="text-center mb-1 text-xs font-medium">
             {tempTranspose === 0 ? 'Original pitch' : `${tempTranspose > 0 ? '+' : ''}${tempTranspose} semitones`}
