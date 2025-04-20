@@ -1,0 +1,140 @@
+
+/* Audio player styles */
+.audio-player {
+  background-color: rgba(26, 31, 44, 0.95); /* Darker background */
+  backdrop-filter: blur(8px);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.audio-player-container {
+  transition: all 0.3s ease;
+}
+
+/* Volume slider styles */
+.volume-slider-container {
+  transition: opacity 0.2s ease;
+}
+
+.volume-slider,
+.speed-slider,
+.transpose-slider,
+.balance-slider {
+  background: white;
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  animation: slide-in 0.2s ease-out;
+  transform-origin: bottom center;
+}
+
+/* Slider animations */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Audio control consistency */
+.audio-control-button {
+  position: relative;
+  height: 50px !important; /* Fixed height for all buttons */
+  padding-bottom: 20px !important; /* Space for label */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.audio-control-icon {
+  margin-top: 6px; /* Center the icon in the top portion */
+  height: 24px; /* Fixed height for all icons */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.audio-control-label {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--muted-foreground, #71717a);
+  text-align: center;
+}
+
+/* Seekbar specific styles */
+.audio-control-button .audio-control-icon.w-full {
+  width: 100%;
+}
+
+/* Time label positioning */
+.audio-control-label-left {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  transform: none;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  font-weight: 400;
+  color: var(--muted-foreground, #71717a);
+  text-align: left;
+}
+
+.audio-control-label-right {
+  position: absolute;
+  bottom: 4px;
+  right: 0;
+  left: auto;
+  transform: none;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  font-weight: 400;
+  color: var(--muted-foreground, #71717a);
+  text-align: right;
+}
+
+/* Play/Pause button specific styles */
+.play-pause-button {
+  width: 44px !important; /* Fixed width for play/pause button */
+}
+
+.play-pause-button .audio-control-icon {
+  height: 36px !important; /* Increased height for the icons but not too much */
+  margin-top: 2px; /* Slight adjustment to match other icons vertically */
+}
+
+/* Adjustments for the Play button icon (offset triangle) */
+.play-pause-button svg[data-lucide="play"] {
+  position: relative;
+  left: 2px; /* Slight offset to center the triangle shape visually */
+}
+
+/* Enhance slider contrast */
+.audio-player .slider-root {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.audio-player [role="slider"] {
+  background-color: #1EAEDB; /* Bright blue for better visibility */
+}
+
+/* Button hover states in audio player */
+.audio-player button:hover {
+  background-color: rgba(0, 0, 0, 0.4); /* Darker hover state */
+}

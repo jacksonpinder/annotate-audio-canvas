@@ -1,0 +1,94 @@
+
+/* Piano keyboard styles */
+.piano-key.white-key {
+  height: 160px;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(to bottom, #fff 0%, #f5f5f5 100%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+.piano-key.white-key:active,
+.piano-key.white-key.active {
+  background: linear-gradient(to bottom, #f0f0f0 0%, #e0e0e0 100%);
+  transform: translateY(1px);
+}
+
+.piano-key.black-key {
+  height: 80px; /* Set to 50% of white key height */
+  background: linear-gradient(to bottom, #333 0%, #000 100%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  border-radius: 0 0 2px 2px;
+  z-index: 2;
+}
+
+.piano-key.black-key:active,
+.piano-key.black-key.active {
+  background: linear-gradient(to bottom, #555 0%, #222 100%);
+  transform: translateY(1px);
+}
+
+/* Piano scroll buttons */
+.piano-keyboard-container .scroll-button {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Piano container positioning */
+.piano-container {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+  height: 176px; /* 160px for keys + 16px total padding */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform: translateY(100%);
+  visibility: hidden;
+  /* Default state - no transition on initial load */
+}
+
+/* Show piano when active - entry animation */
+.piano-container.active {
+  transform: translateY(0);
+  visibility: visible;
+  transition: transform 0.3s ease, visibility 0s; /* Only slide animation */
+}
+
+/* Hide piano when inactive - exit animation */
+.piano-container.was-active {
+  transition: transform 0.3s ease, visibility 0s 0.3s; /* Delayed visibility change until after animation */
+}
+
+.piano-keyboard-container {
+  width: 100%;
+  position: relative;
+  padding: 8px 0; /* Reduced padding */
+}
+
+.piano-keyboard-container .container {
+  max-width: 1500px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* Connect with audio player */
+.audio-player-container.piano-open {
+  margin-bottom: 176px; /* Match piano container height */
+}
