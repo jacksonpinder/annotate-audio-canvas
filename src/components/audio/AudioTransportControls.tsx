@@ -10,6 +10,8 @@ interface AudioTransportControlsProps {
   skip: (seconds: number) => void;
   handleTimeChange: (newValue: number[]) => void;
   formatTime: (time: number) => string;
+  isDisabled?: boolean;
+  needsUserInteraction?: boolean;
 }
 
 export default function AudioTransportControls({
@@ -19,50 +21,47 @@ export default function AudioTransportControls({
   togglePlayPause,
   skip,
   handleTimeChange,
-  formatTime
+  formatTime,
+  isDisabled = false,
+  needsUserInteraction = false
 }: AudioTransportControlsProps) {
+
+  const PlayPauseIcon = isPlaying ? Pause : Play;
+  const playPauseLabel = isPlaying ? "Pause" : "Play";
+  
+  const playButtonClass = needsUserInteraction ? "animate-pulse border border-yellow-500" : "";
+
   return (
     <>
       {/* Play/Pause Button */}
-      <Button 
-        variant="ghost" 
-        size="icon" 
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={togglePlayPause}
-        aria-label={isPlaying ? "Pause" : "Play"}
-        className="audio-control-button flex-shrink-0 play-pause-button"
+        aria-label={playPauseLabel}
+        className={`control-slot play-pause-button ${playButtonClass}`}
+        data-state={isPlaying ? "active" : "inactive"}
+        disabled={isDisabled}
       >
-        <div className="audio-control-icon flex items-center justify-center w-full">
-          {isPlaying ? 
-            <Pause className="transform scale-[2.2]" strokeWidth={1.2} /> : 
-            <Play className="transform scale-[2.2]" strokeWidth={1.2} />
-          }
+        <div className="icon-slot">
+          <PlayPauseIcon strokeWidth={1.2} />
         </div>
+        {needsUserInteraction && <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-yellow-500"></span>}
       </Button>
       
       {/* Rewind 15 seconds */}
-      <Button 
-        variant="ghost" 
-        size="icon" 
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={() => skip(-15)}
         aria-label="Rewind 15 seconds"
-        className="audio-control-button flex-shrink-0 rewind-button"
+        className="control-slot rewind-button"
+        disabled={isDisabled}
       >
-        <div className="audio-control-icon relative">
+        <div className="icon-slot">
           <RotateCcw strokeWidth={1.2} />
-          <span 
-            className="absolute text-[11px] font-semibold text-current" 
-            style={{ 
-              top: '50%', 
-              left: '50%', 
-              transform: 'translate(-50%, -50%)',
-              marginTop: '-1px',
-              marginLeft: '1px'
-            }}
-          >
-            15
-          </span>
+          <span className="numeric-label">15</span>
         </div>
-        <span className="audio-control-label font-light opacity-50"></span>
       </Button>
       
       {/* Progress Bar Container */}
@@ -72,11 +71,12 @@ export default function AudioTransportControls({
           <Slider
             value={[currentTime]}
             min={0}
-            max={duration || 100}
+            max={duration > 0 ? duration : 100}
             step={0.01}
             onValueChange={handleTimeChange}
             aria-label="Seek position"
             className="w-full"
+            disabled={isDisabled || duration <= 0}
           />
         </div>
         
@@ -86,35 +86,24 @@ export default function AudioTransportControls({
             {formatTime(currentTime)}
           </span>
           <span className="absolute right-0 text-xs" style={{ fontSize: '12px', lineHeight: 1 }}>
-            {formatTime(duration - currentTime)}
+            {duration > 0 ? formatTime(Math.max(0, duration - currentTime)) : '--:--'}
           </span>
         </div>
       </div>
       
       {/* Fast Forward 15 seconds */}
-      <Button 
-        variant="ghost" 
-        size="icon" 
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={() => skip(15)}
         aria-label="Fast forward 15 seconds"
-        className="audio-control-button flex-shrink-0 forward-button"
+        className="control-slot forward-button"
+        disabled={isDisabled}
       >
-        <div className="audio-control-icon relative">
+        <div className="icon-slot">
           <RotateCw strokeWidth={1.2} />
-          <span 
-            className="absolute text-[11px] font-semibold text-current" 
-            style={{ 
-              top: '50%', 
-              left: '50%', 
-              transform: 'translate(-50%, -50%)',
-              marginTop: '-1px',
-              marginLeft: '-1px'
-            }}
-          >
-            15
-          </span>
+          <span className="numeric-label">15</span>
         </div>
-        <span className="audio-control-label font-light opacity-50"></span>
       </Button>
     </>
   );

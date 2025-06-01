@@ -1,79 +1,27 @@
+import { useState, useRef, useEffect, useCallback } from 'react';
+import AudioService from '../audio/AudioService';
+import { useAudioReady } from './useAudioReady';
 
-import { useState, useEffect, useRef } from 'react';
+interface UseAudioBalanceOptions {
+  snapThreshold?: number;
+}
 
-type BalanceOptions = {
-  initialBalance?: number; // -1 (full left) to 1 (full right), 0 is center
-  snapThreshold?: number;  // Threshold for center-snapping
-};
-
-export function useAudioBalance(audioElement: React.RefObject<HTMLAudioElement>, options: BalanceOptions = {}) {
-  const { initialBalance = 0, snapThreshold = 0.05 } = options;
-  const [balance, setBalance] = useState<number>(initialBalance);
+export function useAudioBalance(
+  audioElement: React.RefObject<HTMLAudioElement> | null,
+  options: UseAudioBalanceOptions = {}
+) {
+  const { snapThreshold = 0.05 } = options;
+  const [balance, setBalance] = useState<number>(0);
   const [isBalanceVisible, setIsBalanceVisible] = useState<boolean>(false);
   const hideTimerRef = useRef<number | null>(null);
-  
-  // Apply balance effect to audio element
+  const audioReady = useAudioReady();
+
+  // Initialize balance from AudioService in case it was set by other means or persisted
   useEffect(() => {
-    const audio = audioElement.current;
-    if (!audio) return;
-    
-    try {
-      // Create audio context if needed
-      if (!audio.context) {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        const audioContext = new AudioContext();
-        const source = audioContext.createMediaElementSource(audio);
-        const gainNodeLeft = audioContext.createGain();
-        const gainNodeRight = audioContext.createGain();
-        const splitter = audioContext.createChannelSplitter(2);
-        const merger = audioContext.createChannelMerger(2);
-        
-        source.connect(splitter);
-        splitter.connect(gainNodeLeft, 0);
-        splitter.connect(gainNodeRight, 1);
-        gainNodeLeft.connect(merger, 0, 0);
-        gainNodeRight.connect(merger, 0, 1);
-        merger.connect(audioContext.destination);
-        
-        // Store these nodes for later access
-        audio.context = audioContext;
-        audio.gainNodeLeft = gainNodeLeft;
-        audio.gainNodeRight = gainNodeRight;
-      }
-      
-      // Apply balance
-      if (audio.gainNodeLeft && audio.gainNodeRight) {
-        // Map -1...1 to gain values for L/R channels
-        // When balance is 0 (center), both channels are at full gain
-        // When balance is -1 (left), left channel is full, right is 0
-        // When balance is 1 (right), right channel is full, left is 0
-        const gainLeft = balance <= 0 ? 1 : 1 - balance;
-        const gainRight = balance >= 0 ? 1 : 1 + balance;
-        
-        audio.gainNodeLeft.gain.value = gainLeft;
-        audio.gainNodeRight.gain.value = gainRight;
-      }
-    } catch (error) {
-      console.error("Error applying audio balance:", error);
-    }
-  }, [balance, audioElement]);
-  
-  // Function to handle balance change with snap to center
-  const handleBalanceChange = (newValue: number[]) => {
-    let newBalance = newValue[0];
-    
-    // Apply snap to center if close enough
-    if (Math.abs(newBalance) < snapThreshold) {
-      newBalance = 0;
-    }
-    
-    setBalance(newBalance);
-  };
-  
-  // Reset balance to center
-  const resetBalance = () => setBalance(0);
-  
-  // Show balance slider
+    setBalance(AudioService.getCurrentPan());
+  }, []);
+
+  // Handlers for UI state
   const showBalance = () => {
     setIsBalanceVisible(true);
     if (hideTimerRef.current !== null) {
@@ -81,8 +29,7 @@ export function useAudioBalance(audioElement: React.RefObject<HTMLAudioElement>,
       hideTimerRef.current = null;
     }
   };
-  
-  // Hide balance slider after delay (for desktop hover)
+
   const scheduleHideBalance = () => {
     if (hideTimerRef.current !== null) {
       window.clearTimeout(hideTimerRef.current);
@@ -92,8 +39,7 @@ export function useAudioBalance(audioElement: React.RefObject<HTMLAudioElement>,
       hideTimerRef.current = null;
     }, 500);
   };
-  
-  // Hide balance slider immediately
+
   const hideBalanceImmediate = () => {
     setIsBalanceVisible(false);
     if (hideTimerRef.current !== null) {
@@ -101,7 +47,27 @@ export function useAudioBalance(audioElement: React.RefObject<HTMLAudioElement>,
       hideTimerRef.current = null;
     }
   };
-  
+
+  const handleBalanceChange = useCallback((newValue: number[]) => {
+    const newBalanceFromSlider = newValue[0];
+    
+    // 1. Send the slider's value to AudioService (it might snap it)
+    AudioService.setPan(newBalanceFromSlider); 
+    
+    // 2. Get the (potentially snapped) value BACK from AudioService
+    const actualPanValue = AudioService.getCurrentPan(); 
+    
+    // 3. Update the local state that drives the UI slider
+    setBalance(actualPanValue); 
+
+  }, [/* setBalance is stable, AudioService is singleton */]);
+
+  const resetBalance = useCallback(() => {
+    AudioService.setPan(0); // Tell service to reset
+    const actualPanValue = AudioService.getCurrentPan(); // Get the value (should be 0)
+    setBalance(actualPanValue); // Update UI state
+  }, [/* setBalance is stable, AudioService is singleton */]);
+
   // Clean up on unmount
   useEffect(() => {
     return () => {
@@ -110,7 +76,7 @@ export function useAudioBalance(audioElement: React.RefObject<HTMLAudioElement>,
       }
     };
   }, []);
-  
+
   return {
     balance,
     isBalanceVisible,

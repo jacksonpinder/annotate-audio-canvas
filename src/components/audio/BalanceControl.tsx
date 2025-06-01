@@ -2,27 +2,31 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { useRef, useState, useEffect } from 'react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Headphones } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 // Custom Headphone Balance Icon Components for display
 const HeadphonesBalanced = () => (
   <div className="flex items-center gap-1">
-    {/* No labels when balanced */}
+    {/* Render both L and R when balanced, use font-medium (500) */}
+    <span className="font-medium opacity-100">L</span>
+    <span className="font-medium opacity-100">R</span>
   </div>
 );
 
 const HeadphonesLeftBiased = () => (
   <div className="flex items-center gap-1">
-    <span className="font-bold">L</span>
-    <span className="font-normal opacity-60">R</span>
+    {/* Use font-medium, adjust opacity */}
+    <span className="font-medium opacity-100">L</span>
+    <span className="font-medium opacity-50">R</span> 
   </div>
 );
 
 const HeadphonesRightBiased = () => (
   <div className="flex items-center gap-1">
-    <span className="font-normal opacity-70">L</span>
-    <span className="font-bold">R</span>
+    {/* Use font-medium, adjust opacity */}
+    <span className="font-medium opacity-50">L</span> 
+    <span className="font-medium opacity-100">R</span>
   </div>
 );
 
@@ -57,75 +61,84 @@ export default function BalanceControl({
   const isBalanced = balance === 0;
   
   // Store the last non-center balance setting
-  const lastCustomBalanceRef = useRef<number>(isBalanced ? 0.5 : balance);
+  const lastCustomBalanceRef = useRef<number>(0); // no custom until moved
   const [isSliderOpen, setIsSliderOpen] = useState<boolean>(false);
-  const hideTimeoutRef = useRef<number | null>(null);
   
-  // Custom balance toggle function
-  const handleBalanceToggle = () => {
-    if (!isBalanced) {
-      // If not balanced, store current value and reset to center
-      lastCustomBalanceRef.current = balance;
-      resetBalance();
-    } else {
-      // If centered, restore to last non-center value
-      handleBalanceChange([lastCustomBalanceRef.current]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
-  };
-  
-  // Sync external visibility state with local state
-  useEffect(() => {
-    setIsSliderOpen(isBalanceVisible);
-  }, [isBalanceVisible]);
-  
-  // Function to show the slider
-  const handleShowSlider = () => {
-    if (hideTimeoutRef.current) {
-      window.clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = null;
-    }
-    showBalance();
-  };
-  
-  // Function to hide the slider
-  const handleHideSlider = () => {
-    scheduleHideBalance();
   };
 
+  const handleMouseLeave = () => {
+    timerRef.current = setTimeout(() => {
+      setIsSliderOpen(false);
+    }, 250);
+  };
+
+  // Custom balance toggle function
+  const handleBalanceToggle = () => {
+    setIsSliderOpen((prev) => !prev);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const popoverContent = document.querySelector('.balance-slider');
+      const balanceControl = document.querySelector('.balance-control');
+      const audioControlButton = document.querySelector('.audio-control-button');
+
+      if (
+        isSliderOpen &&
+        !balanceControl?.contains(target) &&
+        !audioControlButton?.contains(target) &&
+        !popoverContent?.contains(target)
+      ) {
+        if (balance !== 0) {
+          lastCustomBalanceRef.current = balance;
+        }
+        setIsSliderOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSliderOpen, balance]);
+
   return (
-    <div className="relative flex-shrink-0 balance-control" 
-      onMouseEnter={handleShowSlider}
-      onMouseLeave={handleHideSlider}
-    >
-      <Popover open={isSliderOpen} onOpenChange={setIsSliderOpen}>
-        <PopoverTrigger asChild>
-          <Button 
-            variant={!isBalanced ? "default" : "ghost"}
-            size="icon" 
-            onClick={handleBalanceToggle}
-            aria-label="Adjust audio balance"
-            className="audio-control-button flex-shrink-0"
-            data-state={!isBalanced ? "active" : "inactive"}
-          >
-            <div className="audio-control-icon">
-              <Headphones size={20} />
-            </div>
-            {!isBalanced && (
-              <span className="audio-control-label">
-                {getHeadphonesIcon()}
-              </span>
-            )}
-          </Button>
-        </PopoverTrigger>
-        
-        {/* Balance Slider (shows on hover/tap) */}
-        <PopoverContent 
-          side="top" 
-          align="center" 
+    <div className="relative flex-shrink-0 balance-control">
+      <Popover open={isSliderOpen} onOpenChange={(open) => open && setIsSliderOpen(true)}>
+        <div className="control-with-label">
+          <PopoverTrigger asChild>
+            <Button
+              variant={!isBalanced ? "default" : "ghost"}
+              size="icon"
+              onClick={handleBalanceToggle}
+              aria-label="Adjust audio balance"
+              className="audio-control-button flex-shrink-0"
+              data-state={!isBalanced ? "active" : "inactive"}
+            >
+              <div className="audio-control-icon">
+                <Headphones size={20} />
+              </div>
+            </Button>
+          </PopoverTrigger>
+          <div className="label-below">
+            {getHeadphonesIcon()}
+          </div>
+        </div>
+        <PopoverContent
+          side="top"
+          align="center"
           className="balance-slider w-48 p-3 flex flex-col items-center justify-center gap-1 z-50"
           onClick={(e) => e.stopPropagation()}
-          onMouseEnter={handleShowSlider}
-          onMouseLeave={handleHideSlider}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
           <div className="text-center mb-1 text-xs font-medium">
             Fade left or right

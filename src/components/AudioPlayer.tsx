@@ -1,18 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Home } from 'lucide-react';
+import { Home, Piano, Repeat2 } from 'lucide-react';
 import PianoKeyboard from './PianoKeyboard';
 import { useAudioBalance } from '@/hooks/useAudioBalance';
 import { usePlaybackSpeed } from '@/hooks/usePlaybackSpeed';
 import TransposeControl from './audio/TransposeControl';
 import { useTranspose } from '@/hooks/useTranspose';
+import AudioService from '../audio/AudioService';
+import { useAudioReady } from '@/hooks/useAudioReady';
 
 // Import our new component modules
 import AudioTransportControls from './audio/AudioTransportControls';
 import BalanceControl from './audio/BalanceControl';
 import PlaybackSpeedControl from './audio/PlaybackSpeedControl';
 import VolumeControl from './audio/VolumeControl';
-import AudioUtilityControls from './audio/AudioUtilityControls';
 
 interface AudioPlayerProps {
   audioFile: File | null;
@@ -20,7 +21,6 @@ interface AudioPlayerProps {
 }
 
 export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps) {
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -29,9 +29,12 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
   const [isLooping, setIsLooping] = useState(false);
   const [showPiano, setShowPiano] = useState(false);
   const [wasShowingPiano, setWasShowingPiano] = useState(false);
+  const [isAudioServiceReady, setIsAudioServiceReady] = useState(false);
   
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const animationRef = useRef<number | null>(null);
+  
+  // Use the audioReady hook
+  const audioReady = useAudioReady();
   
   // Initialize the balance control hook
   const {
@@ -42,7 +45,7 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
     hideBalanceImmediate,
     handleBalanceChange,
     resetBalance
-  } = useAudioBalance(audioRef, { snapThreshold: 0.08 });
+  } = useAudioBalance(null, { snapThreshold: 0.08 });
 
   // Initialize the playback speed hook
   const {
@@ -55,8 +58,11 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
     handleTempSpeedChange,
     applySpeed,
     resetSpeed,
-    speedToSliderValue
-  } = usePlaybackSpeed(audioRef);
+    speedToSliderValue,
+    MIN_SPEED,
+    MAX_SPEED,
+    SPEED_STEP
+  } = usePlaybackSpeed(null);
 
   // Initialize the transpose hook
   const {
@@ -69,24 +75,66 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
     handleTempTransposeChange,
     applyTranspose,
     resetTranspose
-  } = useTranspose(audioRef);
+  } = useTranspose(null);
 
-  // Convert the File to a URL for audio element
+  // Initialize AudioService the first time the component mounts
+  useEffect(() => {
+    const initAudioService = async () => {
+      console.log('AudioPlayer: Initializing AudioService');
+      
+      try {
+        // Use unlockAndInit which is now guarded against multiple calls
+        await AudioService.unlockAndInit();
+        console.log('AudioPlayer: AudioService initialized successfully');
+      } catch (error) {
+        console.error('AudioPlayer: Error initializing AudioService:', error);
+      }
+    };
+    
+    initAudioService();
+  }, []);
+
+  // Load the audio file into AudioService
   useEffect(() => {
     if (audioFile) {
-      const fileUrl = URL.createObjectURL(audioFile);
-      setAudioUrl(fileUrl);
-
       // Reset player state when a new file is loaded
       setIsPlaying(false);
       setCurrentTime(0);
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-      }
+      
+      // Load the file into AudioService
+      const loadAudioIntoService = async () => {
+        setIsAudioServiceReady(false);
+        
+        try {
+          // Make sure audio system is ready
+          const unlocked = await AudioService.unlockAndInit();
+          if (!unlocked) {
+            console.error('AudioPlayer: Failed to unlock audio system');
+            return;
+          }
+          
+          console.log('AudioPlayer: Loading audio file into AudioService');
+          const success = await AudioService.loadAudioFile(audioFile);
+          
+          if (success) {
+            console.log('AudioPlayer: Audio loaded into AudioService successfully');
+            setIsAudioServiceReady(true);
+            
+            // Get duration from AudioService
+            setDuration(AudioService.getDuration());
+          } else {
+            console.error('AudioPlayer: Failed to load audio into AudioService');
+          }
+        } catch (error) {
+          console.error('AudioPlayer: Error loading audio:', error);
+        }
+      };
+      
+      loadAudioIntoService();
 
-      // Clean up the URL when component unmounts
+      // Clean up when component unmounts
       return () => {
-        URL.revokeObjectURL(fileUrl);
+        setIsAudioServiceReady(false);
       };
     }
   }, [audioFile]);
@@ -103,85 +151,117 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
 
   // Handle play/pause toggle
   const togglePlayPause = () => {
-    if (!audioRef.current) return;
+    if (!isAudioServiceReady) {
+      console.log('AudioPlayer: AudioService not ready, cannot play/pause');
+      return;
+    }
     
     if (isPlaying) {
-      audioRef.current.pause();
+      // Stop AudioService playback
+      console.log('AudioPlayer: Stopping playback');
+      AudioService.stop();
+      
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
+      
+      setIsPlaying(false);
     } else {
-      audioRef.current.play();
+      // Start AudioService playback
+      console.log('AudioPlayer: Starting playback');
+      AudioService.play();
+      
+      // Start progress bar animation
       animationRef.current = requestAnimationFrame(updateProgressBar);
+      
+      setIsPlaying(true);
     }
-    
-    setIsPlaying(!isPlaying);
   };
 
   // Update progress bar during playback
   const updateProgressBar = () => {
-    if (!audioRef.current) return;
+    // Get current time from AudioService
+    const currentTime = AudioService.getCurrentTime();
+    setCurrentTime(currentTime);
     
-    setCurrentTime(audioRef.current.currentTime);
-    setDuration(audioRef.current.duration);
+    // If we reach the end of the audio and looping is off, stop playback
+    if (currentTime >= duration && !isLooping) {
+      handleEnded();
+      return;
+    }
     
+    // Keep updating the animation frame
     animationRef.current = requestAnimationFrame(updateProgressBar);
   };
 
   // Skip forward or backward by 15 seconds
   const skip = (seconds: number) => {
-    if (!audioRef.current) return;
+    if (!isAudioServiceReady) return;
     
-    audioRef.current.currentTime = Math.min(
-      Math.max(audioRef.current.currentTime + seconds, 0),
-      audioRef.current.duration
+    // Calculate new position
+    const newTime = Math.min(
+      Math.max(currentTime + seconds, 0),
+      duration
     );
     
-    setCurrentTime(audioRef.current.currentTime);
+    // Update display immediately for better UX
+    setCurrentTime(newTime);
+    
+    // Seek to the new position
+    AudioService.seek(newTime);
+    
+    // If we were playing, make sure animation is running
+    if (isPlaying && !animationRef.current) {
+      animationRef.current = requestAnimationFrame(updateProgressBar);
+    }
   };
 
   // Handle seeking through the track
   const handleTimeChange = (newValue: number[]) => {
-    if (!audioRef.current) return;
-    
     const newTime = newValue[0];
-    audioRef.current.currentTime = newTime;
-    setCurrentTime(newTime);
-    
-    if (!isPlaying) {
-      setCurrentTime(newTime);
-    }
+    skip(newTime - currentTime); // Use the skip function with a relative offset
   };
   
   // Handle volume change
   const handleVolumeChange = (newValue: number[]) => {
-    if (!audioRef.current) return;
-    
     const newVolume = newValue[0];
-    audioRef.current.volume = isMuted ? 0 : newVolume;
     setVolume(newVolume);
+    
+    // Apply volume to AudioService
+    if (AudioService.player) {
+      AudioService.player.volume.value = isMuted ? -100 : 20 * Math.log10(newVolume); // Convert to dB
+    }
   };
 
   // Toggle mute
   const toggleMute = () => {
-    if (!audioRef.current) return;
-    
     if (isMuted) {
-      audioRef.current.volume = volume;
       setIsMuted(false);
+      
+      // Restore volume
+      if (AudioService.player) {
+        AudioService.player.volume.value = 20 * Math.log10(volume); // Convert to dB
+      }
     } else {
-      audioRef.current.volume = 0;
       setIsMuted(true);
+      
+      // Mute volume
+      if (AudioService.player) {
+        AudioService.player.volume.value = -100; // Effectively mute
+      }
     }
   };
 
   // Toggle loop
   const toggleLoop = () => {
-    if (!audioRef.current) return;
+    const newLoopState = !isLooping;
+    setIsLooping(newLoopState);
     
-    audioRef.current.loop = !isLooping;
-    setIsLooping(!isLooping);
+    // Apply loop state to AudioService
+    if (AudioService.player) {
+      AudioService.player.loop = newLoopState;
+    }
   };
 
   // Toggle piano visibility
@@ -213,93 +293,110 @@ export default function AudioPlayer({ audioFile, onHomeClick }: AudioPlayerProps
     }
   };
 
-  // Load audio metadata
-  const handleLoadedMetadata = () => {
-    if (!audioRef.current) return;
-    
-    setDuration(audioRef.current.duration);
-  };
-
   return (
     <div className={`audio-player-container ${showPiano ? 'piano-open' : ''}`}>
       <div className="audio-player bg-muted p-3 rounded-md shadow-md">
-        {audioUrl ? (
-          <>
-            
-            <audio
-              ref={audioRef}
-              src={audioUrl}
-              onLoadedMetadata={handleLoadedMetadata}
-              onEnded={handleEnded}
-              onPause={() => setIsPlaying(false)}
-              onPlay={() => setIsPlaying(true)}
+        {audioFile ? (
+          <div className="flex items-center space-x-2 md:space-x-3">
+            <AudioTransportControls
+              isPlaying={isPlaying}
+              currentTime={currentTime}
+              duration={duration}
+              togglePlayPause={togglePlayPause}
+              skip={skip}
+              handleTimeChange={handleTimeChange}
+              formatTime={formatTime}
+              disabled={!audioReady || !isAudioServiceReady}
             />
             
-            <div className="flex items-center space-x-2 md:space-x-3">
-              
-              {/* Audio Transport Controls (contains Play/pause, 15 sec back, Seek, 15 sec ahead) */}
-              <AudioTransportControls
-                isPlaying={isPlaying}
-                currentTime={currentTime}
-                duration={duration}
-                togglePlayPause={togglePlayPause}
-                skip={skip}
-                handleTimeChange={handleTimeChange}
-                formatTime={formatTime}
-              />
-              
-              {/* Volume Control */}
-              <VolumeControl
-                volume={volume}
-                isMuted={isMuted}
-                toggleMute={toggleMute}
-                handleVolumeChange={handleVolumeChange}
-              />
-              
-              {/* Balance Control */}
-              <BalanceControl
-                balance={balance}
-                isBalanceVisible={isBalanceVisible}
-                showBalance={showBalance}
-                scheduleHideBalance={scheduleHideBalance}
-                handleBalanceChange={handleBalanceChange}
-                resetBalance={resetBalance}
-              />
-              
-              {/* Transpose Control (Pitch) */}
-              <TransposeControl
-                transpose={transpose}
-                tempTranspose={tempTranspose}
-                isTransposeVisible={isTransposeVisible}
-                showTranspose={showTranspose}
-                scheduleHideTranspose={scheduleHideTranspose}
-                handleTempTransposeChange={handleTempTransposeChange}
-                applyTranspose={applyTranspose}
-                resetTranspose={resetTranspose}
-              />
-              
-              {/* Playback Speed Control */}
-              <PlaybackSpeedControl
-                speed={speed}
-                tempSpeed={tempSpeed}
-                isSpeedControlVisible={isSpeedControlVisible}
-                showSpeedControl={showSpeedControl}
-                scheduleHideSpeedControl={scheduleHideSpeedControl}
-                handleTempSpeedChange={handleTempSpeedChange}
-                applySpeed={applySpeed}
-                resetSpeed={resetSpeed}
-                speedToSliderValue={speedToSliderValue}
-              />
-              
-              {/* Utility Controls (Loop and Piano) */}
-              <AudioUtilityControls
-                isLooping={isLooping}
-                showPiano={showPiano}
-                toggleLoop={toggleLoop}
-                togglePiano={togglePiano}
-              />
+            {/* Volume Control (First) */}
+            <VolumeControl
+              volume={volume}
+              isMuted={isMuted}
+              toggleMute={toggleMute}
+              handleVolumeChange={handleVolumeChange}
+              className="volume-button"
+              disabled={!audioReady || !isAudioServiceReady}
+            />
+
+            {/* Balance Control (Fourth) */}
+            <BalanceControl
+              balance={balance}
+              isBalanceVisible={isBalanceVisible}
+              showBalance={showBalance}
+              scheduleHideBalance={scheduleHideBalance}
+              handleBalanceChange={handleBalanceChange}
+              resetBalance={resetBalance}
+              disabled={!audioReady || !isAudioServiceReady}
+            />
+            
+            {/* Transpose Control (Fifth) */}
+            <TransposeControl
+              transpose={transpose}
+              tempTranspose={tempTranspose}
+              isTransposeVisible={isTransposeVisible}
+              showTranspose={showTranspose}
+              scheduleHideTranspose={scheduleHideTranspose}
+              handleTempTransposeChange={handleTempTransposeChange}
+              applyTranspose={applyTranspose}
+              resetTranspose={resetTranspose}
+              disabled={!audioReady || !isAudioServiceReady}
+            />
+            
+            {/* Playback Speed Control */}
+            <PlaybackSpeedControl
+              speed={speed}
+              tempSpeed={tempSpeed}
+              isSpeedControlVisible={isSpeedControlVisible}
+              showSpeedControl={showSpeedControl}
+              scheduleHideSpeedControl={scheduleHideSpeedControl}
+              handleTempSpeedChange={handleTempSpeedChange}
+              applySpeed={applySpeed}
+              resetSpeed={resetSpeed}
+              speedToSliderValue={speedToSliderValue}
+              MIN_SPEED={MIN_SPEED}
+              MAX_SPEED={MAX_SPEED}
+              SPEED_STEP={SPEED_STEP}
+              disabled={!audioReady || !isAudioServiceReady}
+            />
+
+            {/* Loop Button (now Fifth) */}
+            <div className="control-with-label">
+              <Button 
+                variant={isLooping ? "default" : "ghost"} 
+                size="icon" 
+                onClick={toggleLoop}
+                aria-label={isLooping ? "Disable loop" : "Enable loop"}
+                className="audio-control-button"
+                data-state={isLooping ? "active" : "inactive"}
+                disabled={!audioReady || !isAudioServiceReady}
+              >
+                <div className="audio-control-icon">
+                  <Repeat2 size={20} strokeWidth={2} />
+                </div>
+              </Button>
+              {isLooping && (
+                <div className="label-below">
+                  Loop
+                </div>
+              )}
             </div>
-          </>
+
+            {/* Piano Button (now Sixth) */}
+            <Button 
+              variant={showPiano ? "default" : "ghost"} 
+              size="icon" 
+              onClick={togglePiano}
+              aria-label={showPiano ? "Hide piano" : "Show piano"}
+              className="control-slot piano-button"
+              data-state={showPiano ? "active" : "inactive"}
+              disabled={!audioReady || !isAudioServiceReady}
+            >
+              <div className="icon-slot">
+                <Piano size={20} strokeWidth={2} />
+              </div>
+            </Button>
+          </div>
         ) : (
           <div className="text-center py-2 text-muted-foreground">
             <p>Upload an audio file to start playback</p>

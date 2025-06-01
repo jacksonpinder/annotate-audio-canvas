@@ -42,6 +42,7 @@
     "@react-pdf-viewer/core": "^3.12.0",
     "@react-pdf-viewer/default-layout": "^3.12.0",
     "@react-pdf-viewer/zoom": "^3.12.0",
+    "@soundtouchjs/audio-worklet": "0.2.1",
     "@tanstack/react-query": "^5.56.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -66,19 +67,27 @@
     "rough": "^3.0.1",
     "roughjs": "^4.6.6",
     "sonner": "^1.5.0",
+    "soundtouchjs": "github:cutterbl/SoundTouchJS#master",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
-    "tone": "^15.0.4",
+    "tone": "^15.1.22",
     "vaul": "^0.9.3",
+    "wavesurfer.js": "^7.9.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
+    "@originjs/vite-plugin-commonjs": "^1.0.3",
+    "@rollup/plugin-commonjs": "^28.0.3",
     "@tailwindcss/typography": "^0.5.15",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.5.5",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react-swc": "^3.5.0",
+    "@types/testing-library__jest-dom": "^5.14.9",
+    "@vitejs/plugin-react-swc": "^3.9.0",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
@@ -90,6 +99,8 @@
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.18",
-    "vite-plugin-static-copy": "^2.3.1"
+    "vite-plugin-pwa": "^1.0.0",
+    "vite-plugin-static-copy": "^2.3.1",
+    "vitest": "^3.1.2"
   }
 }

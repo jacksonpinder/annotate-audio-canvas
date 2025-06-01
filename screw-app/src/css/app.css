@@ -1,0 +1,30 @@
+/* Basic styling for the Screw app */
+.navbar {
+  background-color: #f8f9fa;
+  margin-bottom: 20px;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  border-color: #007bff;
+}
+
+.btn-primary:hover {
+  background-color: #0069d9;
+  border-color: #0062cc;
+}
+
+input[type=range] {
+  width: 100%;
+  margin: 8px 0;
+}
+
+.row {
+  margin-bottom: 15px;
+}
+
+/* Ensure the file input is visually hidden but available for screen readers */
+input[type=file] {
+  position: absolute;
+  left: -9999px;
+} 

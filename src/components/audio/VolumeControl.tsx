@@ -10,13 +10,15 @@ interface VolumeControlProps {
   isMuted: boolean;
   toggleMute: () => void;
   handleVolumeChange: (newValue: number[]) => void;
+  className?: string;
 }
 
 export default function VolumeControl({
   volume,
   isMuted,
   toggleMute,
-  handleVolumeChange
+  handleVolumeChange,
+  className
 }: VolumeControlProps) {
   const [isVolumeSliderOpen, setIsVolumeSliderOpen] = useState<boolean>(false);
   const hideTimeoutRef = useRef<number | null>(null);
@@ -131,7 +133,7 @@ export default function VolumeControl({
 
   return (
     <div 
-      className="relative flex-shrink-0 volume-control"
+      className={cn("relative flex-shrink-0 volume-control", className)}
       onMouseEnter={() => {
         if (!isHoveringSlider) {
           showVolumeSlider();
@@ -146,23 +148,17 @@ export default function VolumeControl({
       <Popover open={isVolumeSliderOpen} onOpenChange={setIsVolumeSliderOpen}>
         <PopoverTrigger asChild>
           <Button 
-            variant={isMuted ? "default" : "ghost"}
+            variant={isMuted ? "destructive" : volume === 0 ? "secondary" : "ghost"}
             size="icon" 
             onClick={handleToggleMute}
-            aria-label={isMuted ? "Unmute audio" : "Mute audio"}
-            aria-pressed={isMuted}
-            className="audio-control-button flex-shrink-0"
+            aria-label={isMuted ? "Unmute" : "Mute"}
+            className={cn("audio-control-button flex-shrink-0", className)}
             data-state={isMuted ? "active" : "inactive"}
             title={isMuted ? "Unmute" : "Mute"}
           >
             <div className="audio-control-icon volume-icon">
               {getVolumeIcon()}
             </div>
-            {isMuted && (
-              <span className="audio-control-label">
-                Muted
-              </span>
-            )}
           </Button>
         </PopoverTrigger>
         <PopoverContent 

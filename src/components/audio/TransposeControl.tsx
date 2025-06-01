@@ -3,6 +3,7 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { useRef, useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import AudioService from '@/audio/AudioService';
 
 interface TransposeControlProps {
   transpose: number;
@@ -34,9 +35,15 @@ export default function TransposeControl({
   const lastCustomTransposeRef = useRef<number>(isTransposed ? transpose : 2);
   const [isSliderOpen, setIsSliderOpen] = useState<boolean>(false);
   const hideTimeoutRef = useRef<number | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Custom toggle function for transpose
   const handleTransposeToggle = () => {
+    setIsSliderOpen((prev) => !prev);
+  };
+  
+  // Separate function for handling pitch changes - to be used elsewhere, not on button click
+  const handlePitchChange = () => {
     if (isTransposed) {
       // If currently transposed, save value and reset to default
       lastCustomTransposeRef.current = transpose;
@@ -67,46 +74,57 @@ export default function TransposeControl({
     scheduleHideTranspose();
   };
 
+  // Mouse enter and leave handlers
+  const handleMouseEnter = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const handleMouseLeave = () => {
+    timerRef.current = setTimeout(() => {
+      setIsSliderOpen(false);
+    }, 250);
+  };
+
   return (
-    <div className="relative flex-shrink-0 transpose-control"
-      onMouseEnter={handleShowSlider}
-      onMouseLeave={handleHideSlider}
-    >
+    <div className="relative flex-shrink-0 transpose-control">
       <Popover open={isSliderOpen} onOpenChange={setIsSliderOpen}>
-        <PopoverTrigger asChild>
-          <Button 
-            variant={isTransposed ? "default" : "ghost"}
-            size="icon" 
-            onClick={handleTransposeToggle}
-            aria-label="Adjust pitch"
-            className="audio-control-button flex-shrink-0"
-            data-state={isTransposed ? "active" : "inactive"}
-          >
-            <div className="audio-control-icon flex items-center gap-0.5">
-              <span className={cn(
-                "text-base transition-opacity",
-                transpose < 0 ? "opacity-100" : transpose === 0 ? "text-[#0F172A]" : "opacity-40"
-              )}>♭</span>
-              <span className={cn(
-                "text-base transition-opacity",
-                transpose > 0 ? "opacity-100" : transpose === 0 ? "text-[#0F172A]" : "opacity-40"
-              )}>#</span>
-            </div>
-            {isTransposed && (
-              <span className="audio-control-label">
-                {transpose > 0 ? `+${transpose}` : transpose}
-              </span>
-            )}
-          </Button>
-        </PopoverTrigger>
+        <div className="control-with-label">
+          <PopoverTrigger asChild>
+            <Button 
+              variant={isTransposed ? "default" : "ghost"}
+              size="icon" 
+              onClick={handleTransposeToggle}
+              aria-label="Adjust pitch"
+              className="audio-control-button flex-shrink-0"
+              data-state={isTransposed ? "active" : "inactive"}
+            >
+              <div className="audio-control-icon flex items-center gap-0.5">
+                <span className={cn(
+                  "text-base transition-opacity",
+                  transpose < 0 ? "opacity-100" : transpose === 0 ? "text-[#0F172A]" : "opacity-40"
+                )}>♭</span>
+                <span className={cn(
+                  "text-base transition-opacity",
+                  transpose > 0 ? "opacity-100" : transpose === 0 ? "text-[#0F172A]" : "opacity-40"
+                )}>#</span>
+              </div>
+            </Button>
+          </PopoverTrigger>
+          <div className="label-below">
+            {transpose === 0 ? "0" : transpose > 0 ? `+${transpose}` : transpose}
+          </div>
+        </div>
         
         <PopoverContent 
           side="top" 
           align="center" 
           className="transpose-slider w-48 p-3 flex flex-col items-center justify-center gap-1 z-50"
           onClick={(e) => e.stopPropagation()}
-          onMouseEnter={handleShowSlider}
-          onMouseLeave={handleHideSlider}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
           <div className="text-center mb-1 text-xs font-medium">
             {tempTranspose === 0 ? 'Original pitch' : `${tempTranspose > 0 ? '+' : ''}${tempTranspose} semitones`}
@@ -119,7 +137,14 @@ export default function TransposeControl({
               max={100}
               step={8.33}
               onValueChange={(value) => handleTempTransposeChange([sliderToPitch(value[0])])}
-              onValueCommit={applyTranspose}
+              onValueCommit={() => {
+                applyTranspose();
+                if (AudioService.getIsSoundTouchActive()) {
+                  console.log(`TransposeControl: Committing pitch change to ${tempTranspose} semitones`);
+                  AudioService.setPitch(tempTranspose);
+                  AudioService.crossFadeNodes(tempTranspose, AudioService.getCurrentSpeed());
+                }
+              }}
               aria-label="Transpose pitch"
             />
             <span className="text-xs font-medium">+b5</span>
