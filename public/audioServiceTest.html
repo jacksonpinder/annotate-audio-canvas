@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AudioService Test Page</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; }
+        .control-group { margin-bottom: 15px; }
+        label { display: inline-block; width: 150px; margin-bottom: 5px; }
+        input[type="range"], input[type="file"] { margin-bottom: 5px; }
+        button { padding: 10px 15px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; background-color: #007bff; color: white; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; }
+        pre { background-color: #eee; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
+        .info { margin-top: 20px; padding-top: 10px; border-top: 1px solid #eee; }
+        .info p { margin: 5px 0; }
+        #errorDisplay { color: red; font-weight: bold; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AudioService Manual Test</h1>
+
+        <p><strong>Important:</strong> Click anywhere on the page first to unlock the AudioContext if it's suspended by the browser.</p>
+
+        <div class="control-group">
+            <label for="audioFile">Load Audio File:</label>
+            <input type="file" id="audioFile" accept="audio/*">
+        </div>
+
+        <div class="control-group">
+            <button id="playBtn" disabled>Play</button>
+            <button id="pauseBtn" disabled>Pause</button>
+            <button id="stopBtn" disabled>Stop</button>
+        </div>
+
+        <div class="control-group">
+            <label for="pitch">Pitch (semitones):</label>
+            <input type="range" id="pitchSlider" min="-12" max="12" value="0" step="0.5" disabled>
+            <span id="pitchValueDisplay">0</span>
+        </div>
+
+        <div class="control-group">
+            <label for="speed">Speed:</label>
+            <input type="range" id="speedSlider" min="0.5" max="2" value="1" step="0.05" disabled>
+            <span id="speedValueDisplay">1.0</span>
+        </div>
+
+        <div class="control-group">
+            <label for="volume">Volume:</label>
+            <input type="range" id="volumeSlider" min="0" max="1" value="1" step="0.01" disabled>
+            <span id="volumeValueDisplay">1.0</span>
+        </div>
+
+        <div class="control-group">
+            <label for="pan">Pan:</label>
+            <input type="range" id="panSlider" min="-1" max="1" value="0" step="0.05" disabled>
+            <span id="panValueDisplay">0</span>
+        </div>
+        
+        <div class="info">
+            <p>Current Time: <span id="currentTimeDisplay">0.00</span>s</p>
+            <p>Duration: <span id="durationDisplay">0.00</span>s</p>
+            <p>Player State: <span id="playerStateDisplay">unloaded</span></p>
+            <p>File URL: <span id="fileUrlDisplay">-</span></p>
+            <p>Peaks Data (Ch1 samples): <span id="peaksCountDisplay">0</span></p>
+        </div>
+        <div id="errorDisplay"></div>
+
+    </div>
+
+    <script type="module">
+        // Assuming your Vite dev server is running and AudioService is in src/audio/
+        // Vite will handle the .ts extension and path resolution.
+        import audioServiceInstance from '../src/audio/AudioService.ts';
+
+        const audioFileInput = document.getElementById('audioFile');
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        
+        const pitchSlider = document.getElementById('pitchSlider');
+        const pitchValueDisplay = document.getElementById('pitchValueDisplay');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValueDisplay = document.getElementById('speedValueDisplay');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeValueDisplay = document.getElementById('volumeValueDisplay');
+        const panSlider = document.getElementById('panSlider');
+        const panValueDisplay = document.getElementById('panValueDisplay');
+
+        const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+        const durationDisplay = document.getElementById('durationDisplay');
+        const playerStateDisplay = document.getElementById('playerStateDisplay');
+        const fileUrlDisplay = document.getElementById('fileUrlDisplay');
+        const peaksCountDisplay = document.getElementById('peaksCountDisplay');
+        const errorDisplay = document.getElementById('errorDisplay');
+
+        function setControlsDisabled(disabled) {
+            playBtn.disabled = disabled;
+            pauseBtn.disabled = disabled;
+            stopBtn.disabled = disabled;
+            pitchSlider.disabled = disabled;
+            speedSlider.disabled = disabled;
+            volumeSlider.disabled = disabled;
+            panSlider.disabled = disabled;
+        }
+        setControlsDisabled(true); // Initially disabled until file is loaded
+
+        // Unlock audio context on first user interaction with the page body
+        document.body.addEventListener('click', async () => {
+            if (!audioServiceInstance.isContextStarted()) {
+                console.log('Attempting to unlock/start audio context...');
+                try {
+                    await audioServiceInstance.unlockAndInit();
+                    if(audioServiceInstance.isContextStarted()){
+                        console.log('Audio context started successfully.');
+                        errorDisplay.textContent = 'Audio context ready.';
+                    } else {
+                        console.warn('Audio context did not start.');
+                        errorDisplay.textContent = 'Audio context could not be started. Please check browser permissions.';
+                    }
+                } catch (err) {
+                    console.error('Error starting audio context:', err);
+                    errorDisplay.textContent = `Error starting audio context: ${err.message}`;
+                }
+            }
+        }, { once: true });
+
+        audioFileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                console.log('Loading file:', file.name);
+                playerStateDisplay.textContent = 'loading...';
+                errorDisplay.textContent = ''; // Clear previous errors
+                try {
+                    const success = await audioServiceInstance.loadAudioFile(file);
+                    if (success) {
+                        console.log('File loaded successfully via AudioService.');
+                        setControlsDisabled(false);
+                        // Initial values might be set by AudioService, update sliders accordingly
+                        pitchSlider.value = audioServiceInstance.getCurrentPitchSemitones();
+                        pitchValueDisplay.textContent = pitchSlider.value;
+                        speedSlider.value = audioServiceInstance.getCurrentSpeed();
+                        speedValueDisplay.textContent = speedSlider.value;
+                        volumeSlider.value = audioServiceInstance.getCurrentVolume();
+                        volumeValueDisplay.textContent = volumeSlider.value;
+                        panSlider.value = audioServiceInstance.getCurrentPan();
+                        panValueDisplay.textContent = panSlider.value;
+
+                    } else {
+                        console.error('AudioService failed to load file.');
+                        errorDisplay.textContent = 'AudioService reported failure to load file.';
+                        setControlsDisabled(true);
+                    }
+                } catch (err) {
+                    console.error('Error calling loadAudioFile:', err);
+                    errorDisplay.textContent = `Error loading file: ${err.message}`;
+                    setControlsDisabled(true);
+                }
+            }
+        });
+
+        playBtn.addEventListener('click', () => audioServiceInstance.play());
+        pauseBtn.addEventListener('click', () => audioServiceInstance.pause());
+        stopBtn.addEventListener('click', () => audioServiceInstance.stop());
+
+        pitchSlider.addEventListener('input', (event) => {
+            const pitch = parseFloat(event.target.value);
+            audioServiceInstance.setPitch(pitch);
+            pitchValueDisplay.textContent = pitch.toFixed(1);
+        });
+
+        speedSlider.addEventListener('input', (event) => {
+            const speed = parseFloat(event.target.value);
+            audioServiceInstance.setSpeed(speed);
+            speedValueDisplay.textContent = speed.toFixed(2);
+        });
+        
+        volumeSlider.addEventListener('input', (event) => {
+            const volume = parseFloat(event.target.value);
+            audioServiceInstance.setVolume(volume);
+            volumeValueDisplay.textContent = volume.toFixed(2);
+        });
+
+        panSlider.addEventListener('input', (event) => {
+            const pan = parseFloat(event.target.value);
+            audioServiceInstance.setPan(pan);
+            panValueDisplay.textContent = pan.toFixed(2);
+        });
+
+        // AudioService Event Listeners
+        audioServiceInstance.addEventListener('loaded', (e) => {
+            const { duration, peaks, fileUrl } = e.detail;
+            durationDisplay.textContent = duration.toFixed(2);
+            fileUrlDisplay.textContent = fileUrl || '-';
+            peaksCountDisplay.textContent = peaks && peaks[0] ? peaks[0].length : '0';
+            playerStateDisplay.textContent = 'loaded (stopped)';
+            console.log('AudioService Event: loaded', e.detail);
+             errorDisplay.textContent = 'File loaded!';
+        });
+
+        audioServiceInstance.addEventListener('timeupdate', (e) => {
+            currentTimeDisplay.textContent = e.detail.currentTime.toFixed(2);
+        });
+
+        audioServiceInstance.addEventListener('statechange', (e) => {
+            playerStateDisplay.textContent = e.detail.playState + (e.detail.isPlaying ? ' (playing)' : ' (not playing)');
+            console.log('AudioService Event: statechange', e.detail);
+        });
+
+        audioServiceInstance.addEventListener('ended', () => {
+            playerStateDisplay.textContent = 'ended (stopped)';
+            currentTimeDisplay.textContent = audioServiceInstance.getDuration().toFixed(2); // Show full duration
+            console.log('AudioService Event: ended');
+        });
+
+        audioServiceInstance.addEventListener('error', (e) => {
+            console.error('AudioService Event: error', e.detail.message, e.detail.error);
+            errorDisplay.textContent = `SERVICE ERROR: ${e.detail.message}`;
+        });
+        
+        audioServiceInstance.addEventListener('audiocontextstarted', () => {
+            console.log('AudioService Event: audiocontextstarted');
+            errorDisplay.textContent = 'AudioContext started successfully.';
+        });
+        
+        // For debugging the audio graph connection
+        // setTimeout(() => {
+        //     if (audioServiceInstance && audioServiceInstance.debugAudioGraph) {
+        //         audioServiceInstance.debugAudioGraph();
+        //     }
+        // }, 5000);
+
+    </script>
+</body>
+</html> 

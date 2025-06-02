@@ -1,13 +1,30 @@
-import * as Tone from 'tone';
-import { SoundTouchNode, type SoundTouchNodeMessage } from "@soundtouchjs/audio-worklet";
+import { SoundTouchNode, type SoundTouchNodeEventMap } from './SoundTouchNode';
+import { getPeaks } from '../plugins/getPeaks';
+// import * as Tone from 'tone'; // Assuming Tone.js is being phased out here
+// import { SoundTouchNode as LegacySoundTouchNodeAudioWorklet, type SoundTouchNodeMessage } from "@soundtouchjs/audio-worklet"; // Old import
 import { throttle } from 'lodash';
 
-// Add interface for webkitAudioContext
+// Add interface for webkitAudioContext if not already present globally by TypeScript DOM libs
 interface Window {
-    webkitAudioContext: typeof AudioContext;
+    webkitAudioContext?: typeof AudioContext;
 }
 
-console.log('AudioService.ts: Module loaded. Tone version:', Tone.version);
+// Custom events that AudioService will dispatch
+// Simpler event map for now to resolve linter errors, can be enhanced with more advanced TypeScript if needed.
+interface AudioServiceEventDetailMap {
+    'audiocontextstarted': void;
+    'loaded': { duration: number; peaks: number[][]; fileUrl: string | null };
+    'timeupdate': { currentTime: number };
+    'ended': void;
+    'error': { message: string; error?: any };
+    'statechange': { isPlaying: boolean; playState: string };
+    'pitchchange': { pitch: number };
+    'speedchange': { speed: number };
+    'volumechange': { volume: number };
+    'panchange': { pan: number };
+}
+
+// console.log('AudioService.ts: Module loaded.'); // Removed Tone version log
 
 /**
  * Converts semitones to a pitch ratio.
@@ -18,297 +35,141 @@ function semitonesToRatio(semitones: number): number {
     return Math.pow(2, semitones / 12);
 }
 
-class AudioService {
-    // Tone.Context is automatically created when Tone.js objects are used,
-    // or can be accessed via Tone.context.
-    // We don't need to explicitly create a new AudioContext() if using Tone.js throughout.
-    public soundTouchNode: AudioWorkletNode | null = null; // Will be used later
-    public player: Tone.Player | null = null; // Will be used later
-    private isWorkletLoaded: boolean = false; // Will be used later
+class AudioService extends EventTarget {
+    private audioContext: AudioContext | null = null;
+    private soundTouchNode: SoundTouchNode | null = null;
+    private pannerNode: StereoPannerNode | null = null;
+    private gainNode: GainNode | null = null;
+    
+    private masterGainNode: GainNode | null = null; // Optional: if further master control needed before destination
+
+    private audioBuffer: AudioBuffer | null = null;
+    private waveformPeaks: number[][] = [];
+
     private isAudioContextStarted: boolean = false;
-    private limiter: Tone.Compressor | null; // MODIFIED: Made nullable
-    public pitchShiftNode: Tone.PitchShift | null = null; // For fallback
-
-    // Dedicated context for the SoundTouch worklet if Tone.context is incompatible
-    private workletContext: AudioContext | null = null;
-
-    // For bridging contexts
-    private playerToWorkletStreamDest: MediaStreamAudioDestinationNode | null = null;
-    private workletToPlayerStreamDest: MediaStreamAudioDestinationNode | null = null;
-    private workletSourceForPlayerOutput: MediaStreamAudioSourceNode | null = null;
-    private playerSourceForWorkletOutput: MediaStreamAudioSourceNode | null = null;
-
-    // State properties
-    private currentPitchSemitones: number = 0;
-    private isSoundTouchActive: boolean = false;
     private currentFileUrl: string | null = null;
-    private audioBuffer: AudioBuffer | null = null; // Or Tone.ToneAudioBuffer if preferred
-    private stNodes: { node: AudioWorkletNode; gain: GainNode }[] = [];
-    private activeIndex = 0;   // 0 or 1
-    private adapterGain: GainNode | null = null;
-
-    // Add a duration property
-    private duration: number = 0;
-
-    private workletModuleLoaded = false;
-    private readyPromise: Promise<boolean> | null = null;
-
-    private panNode: Tone.Panner | null = null;
-    private currentPan = 0;
-    private currentVolume = 1.0;
+    
+    // State properties (retained from original)
+    private currentPitchSemitones: number = 0;
     private currentSpeedFactor: number = 1.0;
+    private currentPan: number = 0;
+    private currentVolume: number = 1.0; // Linear volume [0, 1]
+    private internalCurrentTime: number = 0; // Updated by SoundTouchNode events
+    private internalDuration: number = 0; // Updated by SoundTouchNode events or AudioBuffer
+    private playState: 'stopped' | 'playing' | 'paused' = 'stopped';
+
+    private isLoading: boolean = false;
+    private isReadyForPlayback: boolean = false; // True when audio is loaded and STN is ready
+
+    // Keep this for UI purposes if unlockAndInit is still relevant
+    private readyPromise: Promise<boolean> | null = null; 
+
+    // Default samples per pixel for peak generation (can be made configurable)
+    private SAMPLES_PER_PEAK_PIXEL = 1024; 
 
     constructor() {
-        console.log('AudioService: Constructor called. Tone.context state:', Tone.context.state);
-        // Initialize limiter and connect it directly to Tone's main destination
-        this.limiter = null;
-        console.log('AudioService: Limiter is no longer created in constructor.');
+        super();
+        console.log('AudioService: Constructor called.');
+        // No limiter or other Tone.js specific setup here for now.
+        // Initialization of nodes will happen during loadAudioFile.
     }
-    public getToneContext(): Tone.Context {
-        return Tone.context as any as Tone.Context; // Cast to satisfy specific Tone.Context type
+
+    public getAudioContext(): AudioContext | null {
+        if (!this.audioContext) {
+            try {
+                const GlobalAudioContext = window.AudioContext || (window as any).webkitAudioContext;
+                if (!GlobalAudioContext) {
+                    console.error('AudioService: Web Audio API not supported.');
+                    this.dispatchError('Web Audio API not supported.');
+                    return null;
+                }
+                this.audioContext = new GlobalAudioContext();
+                console.log('AudioService: AudioContext created. State:', this.audioContext.state);
+                // Handle state changes if context is closed or interrupted externally
+                this.audioContext.onstatechange = () => {
+                    console.log('AudioService: AudioContext state changed to:', this.audioContext?.state);
+                    this.isAudioContextStarted = this.audioContext?.state === 'running';
+                    if(this.isAudioContextStarted){
+                        this.dispatchEvent(new CustomEvent('audiocontextstarted'));
+                    }
+                };
+            } catch (e) {
+                console.error('AudioService: Error creating AudioContext:', e);
+                this.dispatchError('Error creating AudioContext.', e);
+                return null;
+            }
+        }
+        return this.audioContext;
     }
 
     public async startAudioContext(): Promise<boolean> {
-        // Check if context is already running or if start has been successfully called before
-        console.log('AudioService: startAudioContext called (stubbed).');
-        this.isAudioContextStarted = false; // Or true if we want to mock success
-        return Promise.resolve(this.isAudioContextStarted);
+        if (this.isContextStarted()) {
+            console.log('AudioService: AudioContext already started.');
+            return true;
+        }
+
+        const context = this.getAudioContext();
+        if (!context) {
+            return false; // Error already dispatched by getAudioContext
+        }
+
+        // Explicitly define the possible states for clarity with the linter
+        type AudioContextState = 'suspended' | 'running' | 'closed' | 'interrupted';
+
+        if (context.state as AudioContextState === 'suspended') {
+            console.log('AudioService: AudioContext is suspended, attempting to resume...');
+            try {
+                await context.resume();
+                console.log('AudioService: AudioContext resumed successfully. State:', context.state);
+                this.isAudioContextStarted = (context.state as AudioContextState) === 'running';
+            } catch (e) {
+                console.error('AudioService: Error resuming AudioContext:', e);
+                this.dispatchError('Error resuming AudioContext.', e);
+                this.isAudioContextStarted = false;
+            }
+        } else {
+            this.isAudioContextStarted = (context.state as AudioContextState) === 'running';
+        }
+        
+        if(this.isAudioContextStarted){
+             this.dispatchEvent(new CustomEvent('audiocontextstarted'));
+        }
+        return this.isAudioContextStarted;
     }
 
     public isContextStarted(): boolean {
-        // More robust check: context must be 'running'
-        return this.isAudioContextStarted && Tone.context.state === 'running';
+        // Explicitly define the possible states for clarity with the linter
+        type AudioContextState = 'suspended' | 'running' | 'closed' | 'interrupted';
+        return this.isAudioContextStarted && (this.audioContext?.state as AudioContextState) === 'running';
     }
 
     public async unlockAndInit(): Promise<boolean> {
+        console.log('AudioService: unlockAndInit called.');
         if (this.readyPromise) {
             console.log('AudioService: Using existing initialization promise');
             return this.readyPromise;
         }
 
         this.readyPromise = (async () => {
-            // MODIFIED: Simplified to perform minimal setup, no actual audio init
-            console.log('AudioService: unlockAndInit called (stubbed).');
-            // Start the audio context (stubbed)
-            if (!this.isContextStarted()) {
-                await this.startAudioContext();
+            const contextStarted = await this.startAudioContext();
+            if (!contextStarted) {
+                console.warn('AudioService: unlockAndInit failed to start audio context.');
+                // No SoundTouch worklet loading here directly.
+                // SoundTouchNode.create() will handle its own module loading.
+                this.isReadyForPlayback = false;
+                return false;
             }
-
-            // No SoundTouch worklet loading or node creation
-            this.isWorkletLoaded = false;
-            this.soundTouchNode = null;
-            
-            console.log('AudioService: unlockAndInit completed (stubbed).');
-            return true; // Indicate "success" for UI purposes
+            // At this point, the context is started. The service is "ready" for file loading.
+            console.log('AudioService: unlockAndInit completed. Context started.');
+            this.isReadyForPlayback = true; // Or a more specific readiness flag
+            return true;
         })();
 
         return this.readyPromise;
     }
 
-    public async loadSoundTouchModule(): Promise<boolean> {
-        // MODIFIED: Stubbed out
-        console.log('AudioService: loadSoundTouchModule called (stubbed).');
-        this.isWorkletLoaded = false;
-        this.workletModuleLoaded = false;
-        this.workletContext = null; // Ensure no context is active
-        return Promise.resolve(false);
-    }
-
-    public isWorkletAvailableAndLoaded(): boolean {
-        // This now refers to loading into the workletContext strategy
-        // MODIFIED: Always false as worklet isn't loaded
-        return false;
-    }
-
-    public createSoundTouchAudioNode(initialPitchSemitones: number = 0): boolean {
-        // MODIFIED: Stubbed out
-        console.log('AudioService: createSoundTouchAudioNode called (stubbed).');
-        this.soundTouchNode = null;
-        return false;
-    }
-
-    private createFallbackPitchShiftNode(initialPitch: number): boolean {
-        // MODIFIED: Stubbed out
-        console.log('AudioService: createFallbackPitchShiftNode called (stubbed).');
-        this.pitchShiftNode = null;
-        return false;
-    }
-
-    public getActivePitchNode(): Tone.ToneAudioNode | AudioWorkletNode | null {
-        // MODIFIED: Always null as nodes are not created
-        return null;
-    }
-
-    private disconnectAndCleanupBridgeNodes(): void {
-        console.log('AudioService: disconnectAndCleanupBridgeNodes called (stubbed).');
-        // MODIFIED: Remove all disconnection and cleanup logic for bridge nodes
-        // this.player?.disconnect(this.playerToWorkletStreamDest); 
-        if (this.playerToWorkletStreamDest) {
-            // this.playerToWorkletStreamDest.stream.getTracks().forEach(track => track.stop());
-            this.playerToWorkletStreamDest = null;
-            console.log('AudioService: Cleaned up playerToWorkletStreamDest reference (stubbed).');
-        }
-        if (this.workletSourceForPlayerOutput) {
-            // this.workletSourceForPlayerOutput.disconnect(); 
-            this.workletSourceForPlayerOutput = null;
-            console.log('AudioService: Cleaned up workletSourceForPlayerOutput reference (stubbed).');
-        }
-
-        // Clean up SoundTouch nodes array (already stubbed, but ensure it's minimal)
-        for (let i = 0; i < this.stNodes.length; i++) {
-            if (this.stNodes[i]) {
-                // this.stNodes[i].node.disconnect();
-                // this.stNodes[i].gain.disconnect();
-                console.log(`AudioService: Cleaned up SoundTouch node ${i} references (stubbed)`);
-            }
-        }
-        this.stNodes = [];
-        this.activeIndex = 0;
-        
-        if (this.adapterGain) {
-            // this.adapterGain.disconnect();
-            this.adapterGain = null;
-            console.log('AudioService: Cleaned up adapterGain reference (stubbed)');
-        }
-
-        // this.soundTouchNode?.disconnect(); 
-        if (this.workletToPlayerStreamDest) {
-            // this.workletToPlayerStreamDest.stream.getTracks().forEach(track => track.stop());
-            this.workletToPlayerStreamDest = null;
-            console.log('AudioService: Cleaned up workletToPlayerStreamDest reference (stubbed).');
-        }
-        if (this.playerSourceForWorkletOutput) {
-            // this.playerSourceForWorkletOutput.disconnect(); 
-            this.playerSourceForWorkletOutput = null;
-            console.log('AudioService: Cleaned up playerSourceForWorkletOutput reference (stubbed).');
-        }
-
-        // Fallback path disconnections (stubbed)
-        // this.player?.disconnect(this.pitchShiftNode);
-        // this.pitchShiftNode?.disconnect(this.limiter);
-        // this.player?.disconnect(this.limiter);
-
-        this.soundTouchNode = null; // Ensure this is nulled if not already
-
-        console.log('AudioService: Bridge nodes and fallback paths cleanup logic removed (stubbed).');
-    }
-
-    public async loadAudioFile(fileUrlOrBlob: string | File): Promise<boolean> {
-        if (!this.isContextStarted()) {
-            console.warn('AudioService: Tone AudioContext not started. Cannot load audio file.');
-            // MODIFIED: Still check this, but startAudioContext is stubbed
-            // If we want to allow "loading" in UI-only mode, we might need to adjust startAudioContext mock
-            await this.startAudioContext(); // Attempt to "start" it (stubbed)
-            if(!this.isContextStarted()){
-                // If stubbed startAudioContext returns false and we strictly check, then return false here.
-                // For UI-only, perhaps we assume it's "started" or bypass this check.
-                // For now, let's allow it to proceed to demonstrate UI-only file "load"
-                 console.warn('AudioService: AudioContext not "started" (stubbed), proceeding with UI-only load.');
-            }
-        }
-        console.log('AudioService: loadAudioFile called (stubbed).');
-
-        // 1. Full cleanup of previous audio graph elements (stubbed or removed)
-        this.stop(); // Stop playback first (will be stubbed)
-        this.disconnectAndCleanupBridgeNodes(); // Clean up bridge nodes specifically (will be stubbed)
-
-        // MODIFIED: Player is not created
-        if (this.player) {
-            console.log('AudioService: Disposing previous Tone.Player (if any).');
-            // this.player.dispose(); // Actual disposal removed
-            this.player = null;
-        }
-        this.player = null; 
-
-        this.isSoundTouchActive = false; // Default to false
-
-        // MODIFIED: No new player creation or audio graph setup
-        console.log('AudioService: Skipping Tone.Player creation and audio graph setup.');
-
-        // MODIFIED: PanNode is not created
-        this.panNode = null;
-
-
-        // Apply all current control values (these will be stubbed setters)
-        this.setPan(this.currentPan);
-        this.setVolume(this.currentVolume);
-
-        // 5. "Load" audio (non-audio parts)
-        try {
-            if (fileUrlOrBlob instanceof File) {
-                this.currentFileUrl = URL.createObjectURL(fileUrlOrBlob); // Store URL for potential display
-                // URL.revokeObjectURL(this.currentFileUrl) // Should be revoked when no longer needed
-            } else {
-                this.currentFileUrl = fileUrlOrBlob;
-            }
-            console.log('AudioService: Audio "loaded" (file URL stored):', this.currentFileUrl);
-            
-            // Store the duration (dummy value)
-            this.duration = 0; // Or some other placeholder
-            console.log('AudioService: Buffer "loaded", duration set to:', this.duration);
-            
-            // If we stored a created object URL, and aren't using it, revoke it.
-            // For now, currentFileUrl might be used by UI, so leave it.
-
-            return true;
-        } catch (e) {
-            console.error('AudioService: Error "loading" audio (file URL handling):', e);
-            this.player = null; // Ensure player is null
-            return false;
-        }
-    }
-
-    public async play(): Promise<void> { // Added async for potential resume
-        // MODIFIED: Stubbed out
-        if (this.player && this.player.loaded) { // This condition will likely be false
-            console.warn('AudioService: Play called, but player should not be loaded in UI-only mode.');
-        } else {
-            console.log('AudioService: Play called (stubbed). Player not available or not loaded.');
-        }
-        // No actual playback start
-    }
-
-    public stop(): void {
-        console.log('AudioService: stop() called (stubbed).');
-        // MODIFIED: No actual player stop
-        if (this.player) {
-            // this.player.stop(); 
-            console.log('AudioService: Player stop skipped (stubbed).');
-        }
-    }
-
-    public getPlayerState(): string {
-        // MODIFIED: Always stopped
-        return 'stopped';
-    }
-
-    public setPitch(semitones: number, forceUpdate: boolean = false) {
-        this.currentPitchSemitones = semitones;
-        console.log('AudioService: setPitch called with ' + semitones + ' semitones (stubbed). SoundTouch active: ' + this.isSoundTouchActive);
-        // MODIFIED: Removed all audio node interactions
-    }
-
-    public setSpeed(speedFactor: number, forceUpdate: boolean = false) {
-        this.currentSpeedFactor = speedFactor;
-        console.log('AudioService: setSpeed called with ' + speedFactor + ' (stubbed). SoundTouch active: ' + this.isSoundTouchActive);
-        // MODIFIED: Removed all audio node interactions
-    }
-
-    // Public method to apply changes with crossfade
-    public applyParamChange() {
-        // MODIFIED: Stubbed out
-        console.log('AudioService: applyParamChange called (stubbed).');
-        // if (this.isSoundTouchActive) {
-        //     this.crossFade(this.currentPitchSemitones, this.currentSpeedFactor);
-        // }
-    }
-
-    // Public interface to the crossFade method with proper guards
-    public crossFadeNodes(pitch: number, tempo: number) {
-        // MODIFIED: Stubbed out
-        console.warn("AudioService: Cannot crossfade - SoundTouch is not active (stubbed).");
-        return;
-        // this.crossFade(pitch, tempo);
+    private dispatchError(message: string, error?: any) {
+        this.dispatchEvent(new CustomEvent('error', { detail: { message, error } }));
     }
 
     /**
@@ -316,181 +177,468 @@ class AudioService {
      * Call this when the component using AudioService is unmounted.
      */
     public async dispose() {
-        console.log("AudioService: dispose called. Cleaning up non-audio resources.");
-        this.stop(); // Ensure everything is stopped first (stubbed)
+        console.log("AudioService: dispose called. Cleaning up resources.");
+        this.stop(); // Stop playback first
 
-        // MODIFIED: Removed player and limiter disposal
-        this.player = null;
-        this.limiter = null;
-
-        // MODIFIED: Removed bridge component cleanup
-        this.playerToWorkletStreamDest = null;
-        this.workletSourceForPlayerOutput = null;
-        this.workletToPlayerStreamDest = null;
-        this.playerSourceForWorkletOutput = null;
-
-        // MODIFIED: Removed SoundTouchNode cleanup
-        this.soundTouchNode = null;
-
-        // MODIFIED: Removed workletContext cleanup
-        if (this.workletContext) {
-            console.log("AudioService: workletContext reference cleared (no actual closing as it's not created).");
+        if (this.soundTouchNode) {
+            this.soundTouchNode.removeEventListener('timeupdate', this.handleSoundTouchTimeUpdate as EventListener);
+            this.soundTouchNode.removeEventListener('ended', this.handleSoundTouchEnded as EventListener);
+            this.soundTouchNode.removeEventListener('error', this.handleSoundTouchError as EventListener);
+            this.soundTouchNode.removeEventListener('loaded', this.handleSoundTouchLoaded as EventListener);
+            this.soundTouchNode.removeEventListener('statechange', this.handleSoundTouchStateChange as EventListener);
+            this.soundTouchNode.dispose();
+            this.soundTouchNode = null;
         }
-        this.workletContext = null;
 
+        this.pannerNode?.disconnect();
+        this.pannerNode = null;
 
-        this.isAudioContextStarted = false;
-        this.isWorkletLoaded = false;
-        this.isSoundTouchActive = false;
-        this.currentPitchSemitones = 0;
-        // this.currentFileUrl = null; // Keep if UI might need it after dispose, otherwise nullify
+        this.gainNode?.disconnect();
+        this.gainNode = null;
+        
+        // this.masterGainNode?.disconnect(); // If master gain is used
+        // this.masterGainNode = null;
+
         this.audioBuffer = null;
-        this.panNode = null; // Ensure panNode is also cleared
+        this.waveformPeaks = [];
 
-        console.log("AudioService: Non-audio resources disposed/reset.");
+        // Revoke Object URL if one was created for a File object
+        if (this.currentFileUrl && this.currentFileUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(this.currentFileUrl);
+            console.log('AudioService: Revoked Object URL:', this.currentFileUrl);
+        }
+        this.currentFileUrl = null;
+
+        this.internalCurrentTime = 0;
+        this.internalDuration = 0;
+        this.isLoading = false;
+        this.isReadyForPlayback = false;
+        this.playState = 'stopped';
+        
+        // Optional: Close AudioContext if AudioService exclusively owns it.
+        // For a shared or persistent context, this might not be desired here.
+        // if (this.audioContext && this.audioContext.state !== 'closed') {
+        //     try {
+        //         await this.audioContext.close();
+        //         console.log("AudioService: AudioContext closed.");
+        //         this.audioContext = null;
+        //         this.isAudioContextStarted = false;
+        //     } catch (e) {
+        //         console.error("AudioService: Error closing AudioContext:", e);
+        //     }
+        // }
+
+        console.log("AudioService: Resources disposed/reset.");
     }
 
-    // Method to get the current pitch in semitones
+    // Event handlers for SoundTouchNode - define these methods
+    private handleSoundTouchTimeUpdate = (event: Event) => {
+        const customEvent = event as CustomEvent<{ currentTime: number }>;
+        this.internalCurrentTime = customEvent.detail.currentTime;
+        this.dispatchEvent(new CustomEvent('timeupdate', { detail: { currentTime: this.internalCurrentTime }}));
+    };
+
+    private handleSoundTouchEnded = () => {
+        this.playState = 'stopped';
+        this.internalCurrentTime = this.internalDuration; // Or 0, depending on desired behavior for 'stop'
+        this.dispatchEvent(new CustomEvent('ended'));
+        this.dispatchEvent(new CustomEvent('statechange', { detail: { isPlaying: false, playState: this.playState }}));
+        this.dispatchEvent(new CustomEvent('timeupdate', { detail: { currentTime: this.internalCurrentTime }})); // Ensure UI updates time on end
+    };
+
+    private handleSoundTouchError = (event: Event) => {
+        const customEvent = event as CustomEvent<{ message: string }>;
+        console.error('AudioService: Error from SoundTouchNode ->', customEvent.detail.message);
+        this.dispatchError('SoundTouchNode error: ' + customEvent.detail.message);
+    };
+
+    private handleSoundTouchLoaded = (event: Event) => {
+        const customEvent = event as CustomEvent<{ duration: number }>;
+        this.internalDuration = customEvent.detail.duration;
+        this.isLoading = false;
+        this.isReadyForPlayback = true;
+        console.log('AudioService: SoundTouchNode reported loaded. Duration:', this.internalDuration);
+        // Dispatch a service 'loaded' event after peaks are also ready in loadAudioFile
+    };
+
+    private handleSoundTouchStateChange = (event: Event) => {
+        const customEvent = event as CustomEvent<{ isPlaying: boolean }>;
+        this.playState = customEvent.detail.isPlaying ? 'playing' : (this.internalCurrentTime > 0 && this.internalCurrentTime < this.internalDuration ? 'paused' : 'stopped');
+        this.dispatchEvent(new CustomEvent('statechange', { detail: { isPlaying: customEvent.detail.isPlaying, playState: this.playState }}));
+    };
+
+    // --- Public API methods to be refactored or implemented ---
+
+    public isWorkletAvailableAndLoaded(): boolean { // Legacy, STN handles its own loading
+        return !!(this.soundTouchNode && this.soundTouchNode.isLoaded);
+    }
+
+    // getPlayerState, setPitch, setSpeed, setPan, setVolume, etc. will be here
+    // getCurrentTime, getDuration, etc.
+
+    // --- Original stubbed/legacy methods to be removed or refactored ---
+    // MODIFIED: Simplified to perform minimal setup, no actual audio init (original comment)
+    // public async unlockAndInit(): Promise<boolean> { (refactored above)
+    
+    // MODIFIED: Stubbed out (original comment)
+    public async loadSoundTouchModule(): Promise<boolean> {
+        console.warn('AudioService: loadSoundTouchModule is deprecated and non-functional.');
+        return Promise.resolve(false);
+    }
+
+    // MODIFIED: Stubbed out (original comment)
+    public createSoundTouchAudioNode(initialPitchSemitones: number = 0): boolean {
+        console.warn('AudioService: createSoundTouchAudioNode is deprecated.');
+        return false; // No longer relevant
+    }
+
+    // MODIFIED: Always null as nodes are not created (original comment)
+    public getActivePitchNode(): AudioNode | null { // Refactor to return STN or null
+        return this.soundTouchNode;
+    }
+
+    // MODIFIED: Remove all disconnection and cleanup logic for bridge nodes (original comment)
+    private disconnectAndCleanupBridgeNodes(): void {
+        console.warn('AudioService: disconnectAndCleanupBridgeNodes is deprecated.');
+    }
+
+    public async loadAudioFile(fileUrlOrBlob: string | File): Promise<boolean> {
+        console.log('AudioService: Loading audio file:', fileUrlOrBlob);
+        if (!this.audioContext || !this.isContextStarted()) {
+            console.warn('AudioService: AudioContext not started. Attempting to start...');
+            const contextStarted = await this.unlockAndInit();
+            if (!contextStarted || !this.audioContext) {
+                this.dispatchError('AudioContext could not be started. Cannot load audio file.');
+                return false;
+            }
+        }
+        // Ensure audioContext is available after unlockAndInit check
+        if (!this.audioContext) {
+             this.dispatchError('AudioContext is not available after initialization attempt.');
+             return false;
+        }
+
+        this.isLoading = true;
+        this.isReadyForPlayback = false;
+        this.playState = 'stopped';
+        this.dispatchEvent(new CustomEvent('statechange', { detail: { isPlaying: false, playState: this.playState }}));
+
+        // 1. Full cleanup of previous audio graph elements
+        this.stop(); // Stop any current playback
+        this.soundTouchNode?.removeEventListener('timeupdate', this.handleSoundTouchTimeUpdate);
+        this.soundTouchNode?.removeEventListener('ended', this.handleSoundTouchEnded);
+        this.soundTouchNode?.removeEventListener('error', this.handleSoundTouchError);
+        this.soundTouchNode?.removeEventListener('loaded', this.handleSoundTouchLoaded);
+        this.soundTouchNode?.removeEventListener('statechange', this.handleSoundTouchStateChange);
+        
+        this.soundTouchNode?.dispose();
+        this.pannerNode?.disconnect();
+        this.gainNode?.disconnect();
+        // this.masterGainNode?.disconnect(); // if used
+
+        this.soundTouchNode = null;
+        this.audioBuffer = null;
+        this.waveformPeaks = [];
+        this.internalCurrentTime = 0;
+        this.internalDuration = 0;
+
+        try {
+            let arrayBuffer: ArrayBuffer;
+            if (typeof fileUrlOrBlob === 'string') {
+                this.currentFileUrl = fileUrlOrBlob;
+                const response = await fetch(this.currentFileUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status} for ${this.currentFileUrl}`);
+                }
+                arrayBuffer = await response.arrayBuffer();
+            } else { // instance of File
+                this.currentFileUrl = URL.createObjectURL(fileUrlOrBlob); // Create a URL for display/reference
+                arrayBuffer = await fileUrlOrBlob.arrayBuffer();
+                // Note: If this.currentFileUrl (Object URL) is not used elsewhere for long,
+                // it should be revoked with URL.revokeObjectURL() when no longer needed (e.g., in dispose or when new file loaded)
+            }
+
+            this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+            console.log('AudioService: Audio data decoded. Duration:', this.audioBuffer.duration);
+            this.internalDuration = this.audioBuffer.duration; // Initial duration
+
+            // 2. Generate Peaks
+            this.waveformPeaks = getPeaks(this.audioBuffer, this.SAMPLES_PER_PEAK_PIXEL);
+            console.log('AudioService: Waveform peaks generated.');
+
+            // 3. Instantiate SoundTouchNode
+            this.soundTouchNode = await SoundTouchNode.create(this.audioContext, this.audioBuffer);
+            console.log('AudioService: SoundTouchNode created.');
+
+            // 4. Create other nodes if they don't exist (or recreate)
+            if (!this.pannerNode || this.pannerNode.context !== this.audioContext) {
+                this.pannerNode = this.audioContext.createStereoPanner();
+            }
+            if (!this.gainNode || this.gainNode.context !== this.audioContext) {
+                this.gainNode = this.audioContext.createGain();
+            }
+            // if (!this.masterGainNode) { this.masterGainNode = this.audioContext.createGain(); }
+
+            // 5. Connect audio graph
+            this.soundTouchNode.connect(this.pannerNode);
+            this.pannerNode.connect(this.gainNode);
+            this.gainNode.connect(this.audioContext.destination);
+            // Or: this.gainNode.connect(this.masterGainNode);
+            //     this.masterGainNode.connect(this.audioContext.destination);
+            console.log('AudioService: Audio graph connected.');
+
+            // 6. Apply initial settings
+            this.setPan(this.currentPan);       // Apply current pan setting
+            this.setVolume(this.currentVolume); // Apply current volume setting
+            this.setPitch(this.currentPitchSemitones); // Apply current pitch (sends to STN)
+            this.setSpeed(this.currentSpeedFactor); // Apply current speed (sends to STN)
+
+            // 7. Setup event listeners for the new SoundTouchNode instance
+            this.soundTouchNode.addEventListener('timeupdate', this.handleSoundTouchTimeUpdate as EventListener);
+            this.soundTouchNode.addEventListener('ended', this.handleSoundTouchEnded as EventListener);
+            this.soundTouchNode.addEventListener('error', this.handleSoundTouchError as EventListener);
+            this.soundTouchNode.addEventListener('loaded', this.handleSoundTouchLoaded as EventListener);
+            this.soundTouchNode.addEventListener('statechange', this.handleSoundTouchStateChange as EventListener);
+            
+            // The 'loaded' event from STN will set isReadyForPlayback and update duration again.
+            // We dispatch the service 'loaded' event from the STN's 'loaded' handler (handleSoundTouchLoaded)
+            // after it confirms its internal readiness and duration.
+            // However, we have peaks and fileUrl now, so let's dispatch the main loaded event.
+            this.isLoading = false; // STN will confirm its own loading via its 'loaded' event.
+                                   // isReadyForPlayback will be set true by STN's 'loaded' handler.
+            this.dispatchEvent(new CustomEvent('loaded', {
+                detail: {
+                    duration: this.internalDuration, 
+                    peaks: this.waveformPeaks,
+                    fileUrl: this.currentFileUrl
+                }
+            }));
+            console.log('AudioService: File processing complete. Waiting for SoundTouchNode to confirm load.');
+            return true;
+
+        } catch (error: any) {
+            console.error('AudioService: Error loading or processing audio file:', error);
+            this.dispatchError(`Error loading audio file: ${error.message}`, error);
+            this.isLoading = false;
+            this.isReadyForPlayback = false;
+            this.currentFileUrl = null; // Clear URL on error
+            return false;
+        }
+    }
+
+    public async play(): Promise<void> {
+        if (!this.audioContext || this.audioContext.state === 'closed') {
+            console.warn('AudioService: AudioContext not available or closed. Cannot play.');
+            this.dispatchError('AudioContext not available or closed.');
+            return;
+        }
+        if (!this.soundTouchNode || !this.soundTouchNode.isLoaded || !this.isReadyForPlayback) {
+            console.warn('AudioService: Not ready to play. SoundTouchNode not loaded or service not ready.');
+            // Optionally, try to load if a file was previously selected but not fully loaded?
+            // Or dispatch an error/warning.
+            return;
+        }
+
+        try {
+            if (this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+                console.log('AudioService: AudioContext resumed for playback.');
+            }
+            this.soundTouchNode.play();
+            // playState will be updated by the 'statechange' event from SoundTouchNode
+        } catch (error: any) {
+            console.error('AudioService: Error attempting to play:', error);
+            this.dispatchError('Error during play initiation.', error);
+        }
+    }
+
+    public pause(): void {
+        if (!this.soundTouchNode || !this.soundTouchNode.isLoaded) {
+            console.warn('AudioService: Not ready to pause. SoundTouchNode not loaded.');
+            return;
+        }
+        this.soundTouchNode.pause();
+        // playState will be updated by the 'statechange' event from SoundTouchNode
+    }
+
+    public stop(): void {
+        if (!this.soundTouchNode) { // No need to check isLoaded, stop should work even if loading
+            // console.warn('AudioService: SoundTouchNode not available to stop.');
+            // If no STN, ensure local state is reset.
+            this.internalCurrentTime = 0;
+            this.playState = 'stopped';
+            this.dispatchEvent(new CustomEvent('timeupdate', { detail: { currentTime: 0 }}));
+            this.dispatchEvent(new CustomEvent('statechange', { detail: { isPlaying: false, playState: this.playState }}));
+            return;
+        }
+        this.soundTouchNode.stop();
+        // playState and currentTime will be updated by events from SoundTouchNode ('statechange' and 'timeupdate')
+        // Specifically, STN's stop should set its time to 0 and trigger timeupdate.
+    }
+
+    public seek(seconds: number): void {
+        if (!this.soundTouchNode || !this.soundTouchNode.isLoaded) {
+            console.warn('AudioService: Not ready to seek. SoundTouchNode not loaded.');
+            return;
+        }
+        if (this.audioBuffer) {
+            const clampedSeconds = Math.max(0, Math.min(seconds, this.internalDuration));
+            this.soundTouchNode.seek(clampedSeconds);
+            // Optimistically update time, or wait for 'seeked' / 'timeupdate' event from STN
+            // For now, STN 'seeked' event will handle the official update.
+            // console.log(`AudioService: Seek requested to ${clampedSeconds}s.`);
+        } else {
+            console.warn('AudioService: No audio buffer loaded, cannot determine seek boundaries.');
+        }
+    }
+
+    public getPlayerState(): string {
+        return this.playState;
+    }
+
+    public setPitch(semitones: number, forceUpdate: boolean = false) {
+        this.currentPitchSemitones = semitones;
+        if (this.soundTouchNode) {
+            this.soundTouchNode.setPitchSemitones(this.currentPitchSemitones);
+            if (forceUpdate) {
+                this.soundTouchNode.flush();
+            }
+            this.dispatchEvent(new CustomEvent('pitchchange', {detail: {pitch: this.currentPitchSemitones}}));
+        } else {
+            console.warn('AudioService: SoundTouchNode not available to set pitch.');
+        }
+    }
+
+    public setSpeed(speedFactor: number, forceUpdate: boolean = false) {
+        this.currentSpeedFactor = speedFactor;
+        if (this.soundTouchNode) {
+            this.soundTouchNode.setTempo(this.currentSpeedFactor); // SoundTouchNode uses setTempo
+            if (forceUpdate) {
+                this.soundTouchNode.flush();
+            }
+            this.dispatchEvent(new CustomEvent('speedchange', {detail: {speed: this.currentSpeedFactor}}));
+        } else {
+            console.warn('AudioService: SoundTouchNode not available to set speed.');
+        }
+    }
+    
+    public applyParamChange() {
+        console.warn('AudioService: applyParamChange is deprecated. Consider calling flush() on SoundTouchNode if needed.');
+        this.soundTouchNode?.flush(); 
+    }
+
+    public crossFadeNodes(pitch: number, tempo: number) {
+        console.warn("AudioService: crossFadeNodes is deprecated.");
+    }
+
     public getCurrentPitchSemitones(): number {
         return this.currentPitchSemitones;
     }
 
-    // Method to get the current speed factor
     public getCurrentSpeed(): number {
         return this.currentSpeedFactor;
     }
 
-    // Method to get the current volume
     public getCurrentVolume(): number {
         return this.currentVolume;
     }
 
-    // Method to get the current pan value
     public getCurrentPan(): number {
         return this.currentPan;
     }
 
-    // Method to check if SoundTouch is active
     public getIsSoundTouchActive(): boolean {
-        return this.isSoundTouchActive;
+        return !!(this.soundTouchNode && this.soundTouchNode.isLoaded);
     }
 
     public isPlayerReady(): boolean {
-        // MODIFIED: Player is never ready in UI-only mode
-        return false;
+        return this.isAudioContextStarted && this.isReadyForPlayback && !!(this.soundTouchNode && this.soundTouchNode.isLoaded);
     }
 
     public isAudioPlaying(): boolean {
-        // MODIFIED: Audio is never playing
-        return false;
+        return this.playState === 'playing';
     }
 
-    // Helper method to debug the audio graph state
     private debugAudioGraph(): void {
-        // MODIFIED: Stubbed out or provide UI-only state
-        console.log('AudioService: ---- Audio Graph Debug Info (UI-Only Mode) ----');
-        console.log('Dual SoundTouch system active:', this.isSoundTouchActive); // Should be false
-        console.log('Active node index:', this.activeIndex);
-        console.log('SoundTouch nodes count:', this.stNodes.length); // Should be 0
-        console.log('Adapter gain exists:', !!this.adapterGain); // Should be false
-        console.log('Legacy soundTouchNode reference:', !!this.soundTouchNode); // Should be null
-        console.log('Current pitch (semitones):', this.currentPitchSemitones);
-        console.log('Current speed factor:', this.currentSpeedFactor);
-        console.log('isSoundTouchActive:', this.isSoundTouchActive);
-        console.log('AudioService: ---- End Debug Info (UI-Only Mode) ----');
+        console.log('AudioService: ---- Audio Graph Debug Info ----');
+        console.log('AudioContext State:', this.audioContext?.state);
+        console.log('SoundTouchNode exists:', !!this.soundTouchNode);
+        console.log('SoundTouchNode isLoaded:', this.soundTouchNode?.isLoaded);
+        console.log('SoundTouchNode isPlaying:', this.soundTouchNode?.isPlaying);
+        console.log('PannerNode exists:', !!this.pannerNode);
+        console.log('GainNode exists:', !!this.gainNode);
+        console.log('Current File URL:', this.currentFileUrl);
+        console.log('Current Time (internal):', this.internalCurrentTime);
+        console.log('Duration (internal):', this.internalDuration);
+        console.log('Waveform Peaks count:', this.waveformPeaks[0]?.length / 2 || 0);
+        console.log('Current Pitch (semitones):', this.currentPitchSemitones);
+        console.log('Current Speed Factor:', this.currentSpeedFactor);
+        console.log('Current Pan:', this.currentPan);
+        console.log('Current Volume:', this.currentVolume);
+        console.log('Play State:', this.playState);
+        console.log('isLoading:', this.isLoading);
+        console.log('isReadyForPlayback:', this.isReadyForPlayback);
+        console.log('AudioService: ---- End Debug Info ----');
     }
 
-    /**
-     * Test method to try different approaches to pitch control
-     * Call this after audio is loaded to test different methods
-     */
     public testPitchControl(): void {
-        // MODIFIED: Stubbed out
-        console.error('AudioService: Cannot test pitch control - SoundTouchNode not active (stubbed).');
-        return;
-    }
-
-    // Add methods for transport control
-    public seek(seconds: number): void {
-        // MODIFIED: Stubbed out
-        console.log(`AudioService: Seeking to ${seconds}s (stubbed).`);
-        // No player interaction
+        console.error('AudioService: testPitchControl is deprecated.');
     }
 
     public getCurrentTime(): number {
-        // MODIFIED: Always 0
-        return 0;
+        return this.internalCurrentTime;
     }
 
     public getDuration(): number {
-        // MODIFIED: Returns stored (dummy) duration
-        return this.duration;
+        return this.internalDuration;
     }
 
     public isReady(): boolean {
-        // MODIFIED: Simplified readiness for UI-only mode
-        // Returns true if "file is loaded" (URL stored) and "context started" (mocked)
-        // For a pure UI-only mode, this could simply be true after init.
-        // Let's make it depend on currentFileUrl being set, and context "started"
-        // return !!this.currentFileUrl && this.isAudioContextStarted;
-        // Or simply:
-        console.log('AudioService: isReady called (stubbed check).');
-        return true; // Assume always ready for UI interaction after unlockAndInit
+        return this.isAudioContextStarted && this.isReadyForPlayback;
     }
 
     public setPan(value: number) {
-        console.log(`AudioService: setPan received raw value: ${value.toFixed(3)}`);
+        // console.log(`AudioService: setPan received raw value: ${value.toFixed(3)}`);
+        let newPanValue = Math.max(-1, Math.min(1, value));
+        // console.log(`AudioService: Clamped newPanValue: ${newPanValue.toFixed(3)}`);
 
-        let newPanValue = Math.max(-1, Math.min(1, value));  // Clamp to [-1, 1]
-        console.log(`AudioService: Clamped newPanValue: ${newPanValue.toFixed(3)}`);
-
-        const snapThreshold = 0.15; 
-        const isWithinThreshold = Math.abs(newPanValue) < snapThreshold;
-
-        console.log(`AudioService: snapThreshold: ${snapThreshold}, Math.abs(newPanValue): ${Math.abs(newPanValue).toFixed(3)}, isWithinThreshold: ${isWithinThreshold}`);
-
-        if (isWithinThreshold) {
+        const snapThreshold = 0.075; // Adjusted threshold from 0.15 for finer control if desired
+        if (Math.abs(newPanValue) < snapThreshold) {
             newPanValue = 0;
-            console.log(`AudioService: Pan value ${value.toFixed(3)} (clamped: ${this.currentPan.toFixed(3)}) IS within threshold ${snapThreshold}. Snapped to center (0).`);
-        } else {
-            console.log(`AudioService: Pan value ${value.toFixed(3)} (clamped: ${newPanValue.toFixed(3)}) IS NOT within threshold ${snapThreshold}. No snap.`);
         }
-
         this.currentPan = newPanValue;
-        console.log("AudioService: Final currentPan set to", this.currentPan.toFixed(3), "(stubbed - no audio effect)");
+        if (this.pannerNode) {
+            this.pannerNode.pan.value = this.currentPan;
+        }
+        // console.log("AudioService: Final currentPan set to", this.currentPan.toFixed(3));
+        this.dispatchEvent(new CustomEvent('panchange', {detail: {pan: this.currentPan}}));
     }
 
     public setVolume(value: number) {
-        this.currentVolume = Math.max(0, Math.min(1, value));  // safety
-        // MODIFIED: Removed player interaction
-        // if (this.player) {
-        //     const dbValue = this.currentVolume === 0 ? -Infinity : 20 * Math.log10(this.currentVolume);
-        //     this.player.volume.value = dbValue;
-        // }
-        console.log("AudioService: volume set to", this.currentVolume, "(stubbed - no audio effect)");
+        this.currentVolume = Math.max(0, Math.min(1, value)); // Linear volume [0,1]
+        if (this.gainNode) {
+            this.gainNode.gain.value = this.currentVolume;
+        }
+        // console.log("AudioService: volume set to", this.currentVolume);
+        this.dispatchEvent(new CustomEvent('volumechange', {detail: {volume: this.currentVolume}}));
     }
 
-    // Legacy method to maintain backward compatibility
     public resetAfterParamChange() {
-        console.log("AudioService: resetAfterParamChange called (stubbed) - using applyParamChange (stubbed)");
-        this.applyParamChange(); // applyParamChange is also stubbed
+        console.warn("AudioService: resetAfterParamChange is deprecated. Use applyParamChange or flush directly if needed.");
+        this.applyParamChange(); 
     }
 
-    // Legacy method - no longer needed with crossfade approach
     private resetSoundTouch() {
-        console.log("AudioService: resetSoundTouch is deprecated (stubbed).");
-        // Do nothing
+        console.warn("AudioService: resetSoundTouch is deprecated.");
     }
     
     private createSTNode(pitchSt: number, tempo: number) {
-        // MODIFIED: Stubbed out
-        console.error("AudioService: Cannot create ST node - workletContext is null (stubbed).");
+        console.error("AudioService: createSTNode is deprecated.");
         return null;
     }
     
     private crossFade(newPitch: number, newTempo: number) {
-        // MODIFIED: Stubbed out
-        console.warn("AudioService: Cannot crossfade - SoundTouch not active (stubbed).");
+        console.warn("AudioService: crossFade is deprecated.");
         return;
     }
 }
