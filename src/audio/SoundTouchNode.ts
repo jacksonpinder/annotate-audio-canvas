@@ -42,7 +42,7 @@ export class SoundTouchNode extends AudioWorkletNode {
   public static async create(context: AudioContext, audioBuffer: AudioBuffer): Promise<SoundTouchNode> {
     if (!SoundTouchNode.workletModuleAdded) {
       try {
-        // Use the worklet from the public directory
+        // Use the bundled worklet from the public directory
         const processorUrl = '/worklets/soundtouch-processor.js';
         
         console.log(`SoundTouchNode: Adding module from URL: ${processorUrl}`);
@@ -133,11 +133,18 @@ export class SoundTouchNode extends AudioWorkletNode {
     }
 
     const leftChannel = audioBuffer.getChannelData(0);
-    // For mono, duplicate channel 0 to channel 1 for stereo processing in SoundTouch
-    const rightChannel = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : leftChannel;
+    // For mono, create a new copy of channel 0 for the right channel
+    // This ensures we have separate ArrayBuffers that can be transferred
+    const rightChannel = audioBuffer.numberOfChannels > 1 
+      ? audioBuffer.getChannelData(1) 
+      : new Float32Array(leftChannel);
 
-    // Transferable objects (ArrayBuffers)
-    const transferable = [leftChannel.buffer, rightChannel.buffer];
+    // Build transfer list with unique ArrayBuffers
+    const transferable: Transferable[] = [leftChannel.buffer];
+    // Only add right channel buffer if it's different from left
+    if (rightChannel.buffer !== leftChannel.buffer) {
+      transferable.push(rightChannel.buffer);
+    }
     
     this.port.postMessage(
       {

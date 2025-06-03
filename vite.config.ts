@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
       viteStaticCopy({
         targets: [
           {
-            src: 'node_modules/@soundtouchjs/audio-worklet/dist/soundtouch-worklet.js',
+            src: 'node_modules/soundtouchjs/dist/soundtouch.js',
             dest: 'assets/worklets'
           }
         ]
