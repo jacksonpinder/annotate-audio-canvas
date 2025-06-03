@@ -40,6 +40,7 @@ class AudioService extends EventTarget {
     private soundTouchNode: SoundTouchNode | null = null;
     private pannerNode: StereoPannerNode | null = null;
     private gainNode: GainNode | null = null;
+    private lowpassNode: BiquadFilterNode | null = null;
     
     private masterGainNode: GainNode | null = null; // Optional: if further master control needed before destination
 
@@ -190,6 +191,9 @@ class AudioService extends EventTarget {
             this.soundTouchNode = null;
         }
 
+        this.lowpassNode?.disconnect();
+        this.lowpassNode = null;
+
         this.pannerNode?.disconnect();
         this.pannerNode = null;
 
@@ -332,6 +336,8 @@ class AudioService extends EventTarget {
         this.soundTouchNode?.removeEventListener('statechange', this.handleSoundTouchStateChange);
         
         this.soundTouchNode?.dispose();
+        this.lowpassNode?.disconnect();
+        this.lowpassNode = null;
         this.pannerNode?.disconnect();
         this.gainNode?.disconnect();
         // this.masterGainNode?.disconnect(); // if used
@@ -371,18 +377,19 @@ class AudioService extends EventTarget {
             console.log('AudioService: SoundTouchNode created.');
 
             // 4. Create other nodes if they don't exist (or recreate)
-            if (!this.pannerNode || this.pannerNode.context !== this.audioContext) {
-                this.pannerNode = this.audioContext.createStereoPanner();
-            }
-            if (!this.gainNode || this.gainNode.context !== this.audioContext) {
-                this.gainNode = this.audioContext.createGain();
-            }
-            // if (!this.masterGainNode) { this.masterGainNode = this.audioContext.createGain(); }
+            this.lowpassNode = this.audioContext.createBiquadFilter();
+            this.lowpassNode.type = 'lowpass';
+            this.lowpassNode.frequency.value = 18000;
+
+            this.pannerNode = this.audioContext.createStereoPanner();
+            this.gainNode = this.audioContext.createGain();
 
             // 5. Connect audio graph
-            this.soundTouchNode.connect(this.pannerNode);
-            this.pannerNode.connect(this.gainNode);
-            this.gainNode.connect(this.audioContext.destination);
+            this.soundTouchNode
+                .connect(this.lowpassNode)
+                .connect(this.pannerNode)
+                .connect(this.gainNode)
+                .connect(this.audioContext.destination);
             // Or: this.gainNode.connect(this.masterGainNode);
             //     this.masterGainNode.connect(this.audioContext.destination);
             console.log('AudioService: Audio graph connected.');
