@@ -200,9 +200,14 @@ export class SoundTouchNode extends AudioWorkletNode {
     // this.dispatchEvent(new CustomEvent('timeupdate', { detail: { currentTime: this._currentTime } }));
   }
 
-  public setPitchSemitones(semitones: number): void {
+  public setPitchSemitones(semitones: number, startTime?: number, timeConstant?: number): void {
     if (!this._isLoaded) return;
-    this.port.postMessage({ type: 'setPitch', semitones });
+    this.port.postMessage({ 
+      type: 'setPitch', 
+      semitones,
+      startTime: startTime || this.context.currentTime,
+      timeConstant: timeConstant || 0 // Default to instant change if no glide specified
+    });
   }
 
   public setTempo(tempo: number): void {

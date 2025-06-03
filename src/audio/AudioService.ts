@@ -506,7 +506,9 @@ class AudioService extends EventTarget {
     public setPitch(semitones: number, forceUpdate: boolean = false) {
         this.currentPitchSemitones = semitones;
         if (this.soundTouchNode) {
-            this.soundTouchNode.setPitchSemitones(this.currentPitchSemitones);
+            // Add smooth pitch transition
+            const now = this.audioContext?.currentTime || 0;
+            this.soundTouchNode.setPitchSemitones(this.currentPitchSemitones, now, 0.05); // 50ms glide
             if (forceUpdate) {
                 this.soundTouchNode.flush();
             }

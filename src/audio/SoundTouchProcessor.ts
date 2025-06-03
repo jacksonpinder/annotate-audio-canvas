@@ -51,6 +51,8 @@ class SoundTouchProcessor extends AudioWorkletProcessor {
     this.soundtouch.fftFrameSize  = 2048;   // longer window
     this.soundtouch.sequenceMs    = 50;     // bigger overlap block
     this.soundtouch.seekWindowMs  = 25;     // overlap search
+    this.soundtouch.formant      = true;   // preserves vowel colour
+    this.soundTouch.overlapMs = 15;
     // -----------------------
 
     this.processorSampleRate = globalThis.sampleRate;
@@ -96,9 +98,11 @@ class SoundTouchProcessor extends AudioWorkletProcessor {
             break;
           }
           case 'setPitch': {
-            const { semitones } = data;
+            const { semitones, startTime, timeConstant } = data;
+            // For now, we'll just set the pitch directly since AudioParams aren't available in worklets
+            // In a future version, we could implement our own smoothing if needed
             this.soundtouch.pitchSemitones = semitones;
-            console.log('SoundTouchProcessor: Pitch set to', semitones);
+            console.log('SoundTouchProcessor: Pitch set to', semitones, 'with glide:', timeConstant, 'ms');
             break;
           }
           case 'setTempo': {

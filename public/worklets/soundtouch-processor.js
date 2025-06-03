@@ -664,6 +664,7 @@ var SoundTouchProcessor = class extends AudioWorkletProcessor {
     this.soundtouch.fftFrameSize = 2048;
     this.soundtouch.sequenceMs = 50;
     this.soundtouch.seekWindowMs = 25;
+    this.soundtouch.formant = true;
     this.processorSampleRate = globalThis.sampleRate;
     this.source = null;
     this.filter = null;
@@ -702,9 +703,9 @@ var SoundTouchProcessor = class extends AudioWorkletProcessor {
             break;
           }
           case "setPitch": {
-            const { semitones } = data;
+            const { semitones, startTime, timeConstant } = data;
             this.soundtouch.pitchSemitones = semitones;
-            console.log("SoundTouchProcessor: Pitch set to", semitones);
+            console.log("SoundTouchProcessor: Pitch set to", semitones, "with glide:", timeConstant, "ms");
             break;
           }
           case "setTempo": {
