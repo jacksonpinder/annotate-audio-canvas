@@ -18,6 +18,13 @@
         .info { margin-top: 20px; padding-top: 10px; border-top: 1px solid #eee; }
         .info p { margin: 5px 0; }
         #errorDisplay { color: red; font-weight: bold; margin-top: 10px; }
+        #waveform { 
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            height: 128px;
+        }
     </style>
 </head>
 <body>
@@ -30,6 +37,8 @@
             <label for="audioFile">Load Audio File:</label>
             <input type="file" id="audioFile" accept="audio/*">
         </div>
+
+        <div id="waveform"></div>
 
         <div class="control-group">
             <button id="playBtn" disabled>Play</button>
@@ -73,8 +82,8 @@
     </div>
 
     <script type="module">
-        // Assuming your Vite dev server is running and AudioService is in src/audio/
-        // Vite will handle the .ts extension and path resolution.
+        // Import WaveSurfer and AudioService
+        import WaveSurfer from '/node_modules/wavesurfer.js/dist/wavesurfer.js';
         import audioServiceInstance from '../src/audio/AudioService.ts';
 
         const audioFileInput = document.getElementById('audioFile');
@@ -97,6 +106,32 @@
         const fileUrlDisplay = document.getElementById('fileUrlDisplay');
         const peaksCountDisplay = document.getElementById('peaksCountDisplay');
         const errorDisplay = document.getElementById('errorDisplay');
+
+        // Initialize WaveSurfer
+        const wavesurfer = WaveSurfer.create({
+            container: '#waveform',
+            waveColor: '#9ca3af',
+            progressColor: '#2563eb',
+            normalize: true,
+            backend: 'WebAudio',
+            height: 128,
+            autoCenter: true,
+            cursorWidth: 2,
+            cursorColor: '#2563eb',
+            hideScrollbar: true,
+            interact: true,  // Allow seeking interaction
+            // Disable audio output by setting volume to 0
+            volume: 0,
+            // Add responsive configuration
+            responsive: true,
+            // Improve interaction handling
+            dragToSeek: true,
+            // Add more precise seeking
+            minPxPerSec: 50
+        });
+
+        let wavesurferReady = false;
+        let isUserSeeking = false;
 
         function setControlsDisabled(disabled) {
             playBtn.disabled = disabled;
@@ -135,12 +170,20 @@
                 console.log('Loading file:', file.name);
                 playerStateDisplay.textContent = 'loading...';
                 errorDisplay.textContent = ''; // Clear previous errors
+                wavesurferReady = false;
+                
                 try {
+                    // Load into AudioService first
                     const success = await audioServiceInstance.loadAudioFile(file);
                     if (success) {
                         console.log('File loaded successfully via AudioService.');
+                        
+                        // Create a new blob URL for WaveSurfer
+                        const blobUrl = URL.createObjectURL(file);
+                        wavesurfer.load(blobUrl);
+                        
+                        // Update controls
                         setControlsDisabled(false);
-                        // Initial values might be set by AudioService, update sliders accordingly
                         pitchSlider.value = audioServiceInstance.getCurrentPitchSemitones();
                         pitchValueDisplay.textContent = pitchSlider.value;
                         speedSlider.value = audioServiceInstance.getCurrentSpeed();
@@ -150,6 +193,10 @@
                         panSlider.value = audioServiceInstance.getCurrentPan();
                         panValueDisplay.textContent = panSlider.value;
 
+                        // Clean up the blob URL when WaveSurfer is done with it
+                        wavesurfer.on('ready', () => {
+                            URL.revokeObjectURL(blobUrl);
+                        });
                     } else {
                         console.error('AudioService failed to load file.');
                         errorDisplay.textContent = 'AudioService reported failure to load file.';
@@ -163,9 +210,17 @@
             }
         });
 
-        playBtn.addEventListener('click', () => audioServiceInstance.play());
-        pauseBtn.addEventListener('click', () => audioServiceInstance.pause());
-        stopBtn.addEventListener('click', () => audioServiceInstance.stop());
+        playBtn.addEventListener('click', () => {
+            audioServiceInstance.play();
+        });
+        
+        pauseBtn.addEventListener('click', () => {
+            audioServiceInstance.pause();
+        });
+        
+        stopBtn.addEventListener('click', () => {
+            audioServiceInstance.stop();
+        });
 
         pitchSlider.addEventListener('input', (event) => {
             const pitch = parseFloat(event.target.value);
@@ -191,6 +246,28 @@
             panValueDisplay.textContent = pan.toFixed(2);
         });
 
+        // WaveSurfer event handlers
+        wavesurfer.on('ready', () => {
+            console.log('WaveSurfer: Audio ready');
+            wavesurferReady = true;
+        });
+
+        wavesurfer.on('seek', (progress) => {
+            if (wavesurferReady && !isUserSeeking) {
+                const seekTime = progress * audioServiceInstance.getDuration();
+                audioServiceInstance.seek(seekTime);
+            }
+        });
+
+        // Add interaction start/end handlers
+        wavesurfer.on('interaction', () => {
+            isUserSeeking = true;
+        });
+
+        wavesurfer.on('seek-end', () => {
+            isUserSeeking = false;
+        });
+
         // AudioService Event Listeners
         audioServiceInstance.addEventListener('loaded', (e) => {
             const { duration, peaks, fileUrl } = e.detail;
@@ -199,11 +276,21 @@
             peaksCountDisplay.textContent = peaks && peaks[0] ? peaks[0].length : '0';
             playerStateDisplay.textContent = 'loaded (stopped)';
             console.log('AudioService Event: loaded', e.detail);
-             errorDisplay.textContent = 'File loaded!';
+            errorDisplay.textContent = 'File loaded!';
+            
+            // Reset seeking state when new file is loaded
+            isUserSeeking = false;
         });
 
         audioServiceInstance.addEventListener('timeupdate', (e) => {
             currentTimeDisplay.textContent = e.detail.currentTime.toFixed(2);
+            // Update WaveSurfer progress only if it's ready and not being interacted with
+            if (wavesurferReady && !isUserSeeking && audioServiceInstance.getDuration() > 0) {
+                const progress = e.detail.currentTime / audioServiceInstance.getDuration();
+                if (isFinite(progress)) {
+                    wavesurfer.seekTo(progress);
+                }
+            }
         });
 
         audioServiceInstance.addEventListener('statechange', (e) => {
@@ -213,27 +300,29 @@
 
         audioServiceInstance.addEventListener('ended', () => {
             playerStateDisplay.textContent = 'ended (stopped)';
-            currentTimeDisplay.textContent = audioServiceInstance.getDuration().toFixed(2); // Show full duration
+            currentTimeDisplay.textContent = audioServiceInstance.getDuration().toFixed(2);
             console.log('AudioService Event: ended');
+            wavesurfer.stop();
+            isUserSeeking = false;
         });
 
+        // Add error handling for seeking
+        wavesurfer.on('error', (err) => {
+            console.error('WaveSurfer error:', err);
+            errorDisplay.textContent = `WaveSurfer error: ${err.message}`;
+        });
+
+        // Add seeking error handling
         audioServiceInstance.addEventListener('error', (e) => {
             console.error('AudioService Event: error', e.detail.message, e.detail.error);
             errorDisplay.textContent = `SERVICE ERROR: ${e.detail.message}`;
+            isUserSeeking = false;
         });
         
         audioServiceInstance.addEventListener('audiocontextstarted', () => {
             console.log('AudioService Event: audiocontextstarted');
             errorDisplay.textContent = 'AudioContext started successfully.';
         });
-        
-        // For debugging the audio graph connection
-        // setTimeout(() => {
-        //     if (audioServiceInstance && audioServiceInstance.debugAudioGraph) {
-        //         audioServiceInstance.debugAudioGraph();
-        //     }
-        // }, 5000);
-
     </script>
 </body>
 </html> 
